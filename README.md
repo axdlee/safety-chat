@@ -1,27 +1,87 @@
-# 安全访问控制插件
+# Safety Chat Plugin
 
-这是一个为 Dify 应用提供安全访问控制功能的插件，支持多种限流算法和存储方式。
+A powerful Dify plugin that provides comprehensive safety and access control features for your applications.
 
-## 功能特点
+## Features
 
-- 支持多种限流算法：
-  - 令牌桶算法（Token Bucket）
-  - 固定窗口算法（Fixed Window）
-  - 滑动窗口算法（Sliding Window）
-  - 漏桶算法（Leaky Bucket）
-  - 混合多桶限制（Multiple Buckets）
+### Rate Limiting
+- Multiple rate limiting algorithms:
+  - Token Bucket Algorithm
+  - Fixed Window Algorithm
+  - Sliding Window Algorithm
+  - Leaky Bucket Algorithm
+  - Multiple Buckets Limitation
 
-- 支持多种存储方式：
-  - Redis 存储
-  - Dify 插件内置 Storage
+### Storage Options
+- Flexible storage backends:
+  - Redis Storage
+  - Dify Plugin Built-in Storage
 
-- 基于多维度的用户信息：
-  - 用户ID
-  - 操作类型
+### User Authentication
+- Multi-dimensional user identification:
+  - User ID
+  - Operation Type
+  - Custom Parameters
 
-## 许可证
+## Installation & Develop
+
+1. Clone the repository:
+```bash
+git clone https://github.com/your-repo/safety-chat.git
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Configure your environment:
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+## Usage
+
+### Step 1: Install the Plugin
+Install the Safety Chat plugin in your Dify application through the plugin marketplace.
+
+### Step 2: Configure the Plugin
+Configure the plugin settings in your Dify application.
+
+![Plugin Configuration](_assets/config.png)
+
+### Step 3: Set Up Rate Limiting
+Configure your preferred rate limiting algorithm and parameters.
+
+![Rate Limiting Setup](_assets/usage-01.png)
+
+![Rate Limiting Setup](_assets/usage-03.png)
+
+### Step 4: Configure External Authentication
+Set up your storage backend (Redis or Dify built-in storage).
+
+### Step 5: Define Access Rules
+Create and manage your access control rules based on your requirements.
+
+## Configuration
+
+The plugin can be configured through the following methods:
+- Environment variables
+- Configuration file
+- Dify plugin settings
+
+## License
 
 MIT License
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Support
+
+For support, please open an issue in the GitHub repository.
 
 
 
