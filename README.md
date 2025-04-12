@@ -27,7 +27,7 @@ A powerful Dify plugin that provides comprehensive safety and access control fea
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-repo/safety-chat.git
+git clone https://github.com/axdlee/safety-chat.git
 ```
 
 2. Install dependencies:
@@ -59,7 +59,7 @@ Configure your preferred rate limiting algorithm and parameters.
 ![Rate Limiting Setup](_assets/usage-03.png)
 
 ### Step 4: Configure External Authentication
-Set up your storage backend (Redis or Dify built-in storage).
+![External Authentication](_assets/usage-02.png)
 
 ### Step 5: Define Access Rules
 Create and manage your access control rules based on your requirements.

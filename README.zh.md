@@ -59,7 +59,7 @@ cp .env.example .env
 ![限流设置](_assets/usage-03.png)
 
 ### 步骤四：配置外部认证
-设置存储后端（Redis或Dify内置存储）。
+![外部认证](_assets/usage-02.png)
 
 ### 步骤五：定义访问规则
 根据您的需求创建和管理访问控制规则。
