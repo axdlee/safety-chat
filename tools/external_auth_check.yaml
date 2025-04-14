@@ -195,6 +195,45 @@ parameters:
     llm_description: Value to match for success
     form: llm
 
+  - name: user_info_extract
+    type: select
+    required: false
+    label:
+      en_US: User Info Extract Method
+      zh_Hans: 用户信息提取方式
+    help:
+      en_US: How to extract user information from the response
+      zh_Hans: 如何从响应中提取用户信息
+    human_description:
+      en_US: Select how to extract user information
+      zh_Hans: 选择如何提取用户信息
+    llm_description: How to extract user information
+    form: llm
+    options:
+      - value: json_path
+        label:
+          en_US: JSON Path
+          zh_Hans: JSON路径
+      - value: regex
+        label:
+          en_US: Regular Expression
+          zh_Hans: 正则表达式
+
+  - name: user_info_pattern
+    type: string
+    required: false
+    label:
+      en_US: User Info Pattern
+      zh_Hans: 用户信息模式
+    help:
+      en_US: JSON path or regex pattern to extract user information, for json_path, please provide the JSON path, for regex, please provide the regex pattern
+      zh_Hans: 用于提取用户信息的JSON路径或正则表达式, 对json_path, 请提供JSON路径, 对regex, 请提供正则表达式
+    human_description:
+      en_US: Please provide the JSON path or regex pattern to extract user information
+      zh_Hans: 请提供用于提取用户信息的JSON路径或正则表达式
+    llm_description: JSON path or regex pattern to extract user information
+    form: llm
+
 output_schema:
   $schema: http://json-schema.org/draft-07/schema#
   type: object
@@ -205,3 +244,12 @@ output_schema:
       type: boolean
       title: Authenticated
       description: Whether the user is authenticated
+    user_info:
+      type:
+        - string
+        - number
+        - object
+        - array
+        - "null"
+      title: User Info
+      description: Extracted user information from the response
