@@ -152,7 +152,7 @@ class ExternalAuthCheckTool(Tool):
         except (KeyError, IndexError, TypeError):
             return None
             
-    def _check_success_json(self, response_data: Dict[str, Any], success_pattern: str, success_value: str) -> bool:
+    def _check_success_json(self, response_data: Dict[str, Any], success_pattern: str, success_value: str) -> str:
         """使用JSON路径检查认证是否成功
         
         Args:
@@ -161,30 +161,30 @@ class ExternalAuthCheckTool(Tool):
             success_value: 成功值
             
         Returns:
-            bool: 是否认证成功
+            str: 是否认证成功("true"/"false")
         """
         try:
             # 获取JSON路径的值
             actual_value = self._get_json_value(response_data, success_pattern)
             if actual_value is None:
-                return False
+                return "false"
                 
             # 检查值是否匹配
             if isinstance(actual_value, bool):
-                return actual_value == (success_value.lower() == "true")
+                return "true" if actual_value == (success_value.lower() == "true") else "false"
             elif isinstance(actual_value, (int, float)):
                 try:
                     expected_value = float(success_value)
-                    return actual_value == expected_value
+                    return "true" if actual_value == expected_value else "false"
                 except ValueError:
-                    return False
+                    return "false"
             else:
-                return str(actual_value) == success_value
+                return "true" if str(actual_value) == success_value else "false"
                 
         except Exception:
-            return False
+            return "false"
             
-    def _check_success_regex(self, response_text: str, success_pattern: str, success_value: str) -> bool:
+    def _check_success_regex(self, response_text: str, success_pattern: str, success_value: str) -> str:
         """使用正则表达式检查认证是否成功
         
         Args:
@@ -193,20 +193,20 @@ class ExternalAuthCheckTool(Tool):
             success_value: 成功值
             
         Returns:
-            bool: 是否认证成功
+            str: 是否认证成功("true"/"false")
         """
         try:
             # 使用正则表达式匹配
             match = re.search(success_pattern, response_text)
             if not match:
-                return False
+                return "false"
                 
             # 如果有捕获组,使用第一个捕获组的值
             matched_value = match.group(1) if match.groups() else match.group(0)
-            return matched_value == success_value
+            return "true" if matched_value == success_value else "false"
             
         except Exception:
-            return False
+            return "false"
             
     def _extract_user_info(self, response_data: Any, extract_method: str, pattern: str) -> str:
         """提取用户信息
@@ -305,6 +305,7 @@ class ExternalAuthCheckTool(Tool):
             # 返回结果
             yield self.create_variable_message("authenticated", authenticated)
             yield self.create_variable_message("user_info", user_info)
+            
             
         except Exception as e:
             yield self.create_text_message(f"Execution failed: {str(e)}") 

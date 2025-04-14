@@ -241,9 +241,9 @@ output_schema:
   additionalProperties: false
   properties:
     authenticated:
-      type: boolean
+      type: string
       title: Authenticated
-      description: Whether the user is authenticated
+      description: Whether the user is authenticated, "true" or "false"
     user_info:
       type: string
       title: User Info

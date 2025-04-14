@@ -181,9 +181,9 @@ output_schema:
   additionalProperties: false
   properties:
     allowed:
-      type: boolean
+      type: string
       title: Allowed
-      description: Whether the request is allowed
+      description: Whether the request is allowed, "true" or "false"
     remaining:
       type: integer
       title: Remaining Requests

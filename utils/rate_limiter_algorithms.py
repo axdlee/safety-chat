@@ -26,7 +26,7 @@ class RateLimiterAlgorithm(ABC):
             
         Returns:
             Dict[str, Any]: {
-                "allowed": bool,  # 是否允许请求
+                "allowed": str,  # 是否允许请求("true"/"false")
                 "remaining": int,  # 剩余请求数
                 "reset_time": int  # 重置时间戳
             }
@@ -62,9 +62,9 @@ class TokenBucketAlgorithm(RateLimiterAlgorithm):
         # 检查限流
         if tokens >= 1:
             tokens -= 1
-            allowed = True
+            allowed = "true"
         else:
-            allowed = False
+            allowed = "false"
             
         # 更新状态
         new_data = {
@@ -111,7 +111,7 @@ class FixedWindowAlgorithm(RateLimiterAlgorithm):
         data["count"] += 1
         
         # 检查限流
-        allowed = data["count"] <= self.max_requests
+        allowed = "true" if data["count"] <= self.max_requests else "false"
         
         # 更新状态
         expire = window_start + self.window_size - now
@@ -149,9 +149,9 @@ class SlidingWindowAlgorithm(RateLimiterAlgorithm):
         # 检查限流
         if len(data["requests"]) < self.max_requests:
             data["requests"].append(now)
-            allowed = True
+            allowed = "true"
         else:
-            allowed = False
+            allowed = "false"
             
         # 更新状态
         self.storage.set(storage_key, data, expire=self.window_size)
@@ -194,9 +194,9 @@ class LeakyBucketAlgorithm(RateLimiterAlgorithm):
         # 检查是否可以加水
         if water < self.capacity:
             water += 1
-            allowed = True
+            allowed = "true"
         else:
-            allowed = False
+            allowed = "false"
             
         # 更新状态
         new_data = {
@@ -267,26 +267,26 @@ class MultipleBucketsAlgorithm(RateLimiterAlgorithm):
         water = max(0, data["water"] - leaked)
         
         # 综合判断是否允许请求
-        allowed = True
+        allowed = "true"
         reasons = []
         
         # 检查令牌桶
         if tokens < 1:
-            allowed = False
+            allowed = "false"
             reasons.append("Token not enough")
             
         # 检查滑动窗口
         if len(data["requests"]) >= self.max_requests:
-            allowed = False
+            allowed = "false"
             reasons.append("Exceeded window limit")
             
         # 检查漏桶
         if water >= self.capacity:
-            allowed = False
+            allowed = "false"
             reasons.append("Exceeded processing capacity")
             
         # 如果允许请求，更新状态
-        if allowed:
+        if allowed == "true":
             # 消耗令牌
             tokens -= 1
             # 记录请求
@@ -324,5 +324,5 @@ class MultipleBucketsAlgorithm(RateLimiterAlgorithm):
             "allowed": allowed,
             "remaining": min(int(tokens), self.max_requests - len(data["requests"]), int(self.capacity - water)),
             "reset_time": int(reset_time),
-            "reasons": reasons if not allowed else None
+            "reasons": reasons if allowed == "false" else None
         } 
