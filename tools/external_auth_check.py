@@ -49,6 +49,13 @@ class ExternalAuthCheckTool(Tool):
         if parameters["success_check"] not in ["json_path", "regex"]:
             raise ValueError("Unsupported success check method")
             
+        # 验证用户信息提取参数
+        if "user_info_extract" in parameters:
+            if parameters["user_info_extract"] not in ["json_path", "regex"]:
+                raise ValueError("Unsupported user info extract method")
+            if not parameters.get("user_info_pattern"):
+                raise ValueError("Missing user info pattern when user_info_extract is specified")
+            
         # 验证JSON参数格式
         for param_field in ["header_params", "query_params", "body_params"]:
             if parameters.get(param_field):
@@ -201,6 +208,34 @@ class ExternalAuthCheckTool(Tool):
         except Exception:
             return False
             
+    def _extract_user_info(self, response_data: Any, extract_method: str, pattern: str) -> Any:
+        """提取用户信息
+        
+        Args:
+            response_data: 响应数据
+            extract_method: 提取方法(json_path/regex)
+            pattern: 提取模式
+            
+        Returns:
+            Any: 提取的用户信息
+        """
+        try:
+            if extract_method == "json_path":
+                if isinstance(response_data, str):
+                    response_data = json.loads(response_data)
+                return self._get_json_value(response_data, pattern)
+            else:  # regex
+                if isinstance(response_data, (dict, list)):
+                    response_text = json.dumps(response_data)
+                else:
+                    response_text = str(response_data)
+                match = re.search(pattern, response_text)
+                if match:
+                    return match.group(1) if match.groups() else match.group(0)
+                return None
+        except Exception:
+            return None
+            
     def _invoke(self, parameters: Dict[str, Any]) -> Generator[ToolInvokeMessage, None, None]:
         """执行工具调用
         
@@ -251,9 +286,19 @@ class ExternalAuthCheckTool(Tool):
                     response_text = response_data
                 authenticated = self._check_success_regex(response_text, parameters["success_pattern"], parameters["success_value"])
                 
+            # 提取用户信息
+            user_info = None
+            if "user_info_extract" in parameters and "user_info_pattern" in parameters:
+                user_info = self._extract_user_info(
+                    response_data,
+                    parameters["user_info_extract"],
+                    parameters["user_info_pattern"]
+                )
+                
             # 返回结果
             yield self.create_json_message({
-                "authenticated": authenticated
+                "authenticated": authenticated,
+                "user_info": user_info
             })
             
         except Exception as e:
