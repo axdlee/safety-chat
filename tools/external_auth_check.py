@@ -38,16 +38,16 @@ class ExternalAuthCheckTool(Tool):
         ]
         for field in required_fields:
             if not parameters.get(field):
-                raise ValueError(f"缺少必需参数: {field}")
+                raise ValueError(f"Missing required parameter: {field}")
                 
         if parameters["request_method"] not in ["GET", "POST", "PUT", "DELETE"]:
-            raise ValueError("不支持的请求方法")
+            raise ValueError("Unsupported request method")
             
         if parameters["response_type"] not in ["json", "text"]:
-            raise ValueError("不支持的响应类型")
+            raise ValueError("Unsupported response type")
             
         if parameters["success_check"] not in ["json_path", "regex"]:
-            raise ValueError("不支持的成功检查方式")
+            raise ValueError("Unsupported success check method")
             
         # 验证JSON参数格式
         for param_field in ["header_params", "query_params", "body_params"]:
@@ -61,7 +61,7 @@ class ExternalAuthCheckTool(Tool):
                         
                         # 确保字符串是有效的JSON格式
                         if not (cleaned_value.startswith('{') and cleaned_value.endswith('}')):
-                            raise ValueError(f"{param_field}必须是有效的JSON对象")
+                            raise ValueError(f"{param_field} must be a valid JSON object")
                             
                         # 解析JSON
                         parsed_json = json.loads(cleaned_value)
@@ -69,9 +69,9 @@ class ExternalAuthCheckTool(Tool):
                         parameters[param_field] = parsed_json
                         
                     except json.JSONDecodeError as e:
-                        raise ValueError(f"{param_field}必须是有效的JSON对象: {str(e)}")
+                        raise ValueError(f"{param_field} must be a valid JSON object: {str(e)}")
                 elif not isinstance(param_value, dict):
-                    raise ValueError(f"{param_field}必须是字典或JSON字符串")
+                    raise ValueError(f"{param_field} must be a dictionary or JSON string")
                     
     def _prepare_headers(self, header_params: Dict[str, Any]) -> Dict[str, str]:
         """准备请求头
@@ -242,7 +242,7 @@ class ExternalAuthCheckTool(Tool):
             # 检查认证结果
             if parameters["success_check"] == "json_path":
                 if parameters["response_type"] != "json":
-                    raise ValueError("使用JSON路径检查时响应类型必须为JSON")
+                    raise ValueError("When using JSON path check, the response type must be JSON")
                 authenticated = self._check_success_json(response_data, parameters["success_pattern"], parameters["success_value"])
             else:  # regex
                 if parameters["response_type"] == "json":
@@ -257,4 +257,4 @@ class ExternalAuthCheckTool(Tool):
             })
             
         except Exception as e:
-            yield self.create_text_message(f"执行失败: {str(e)}") 
+            yield self.create_text_message(f"Execution failed: {str(e)}") 

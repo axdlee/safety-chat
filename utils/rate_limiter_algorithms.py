@@ -273,17 +273,17 @@ class MultipleBucketsAlgorithm(RateLimiterAlgorithm):
         # 检查令牌桶
         if tokens < 1:
             allowed = False
-            reasons.append("令牌不足")
+            reasons.append("Token not enough")
             
         # 检查滑动窗口
         if len(data["requests"]) >= self.max_requests:
             allowed = False
-            reasons.append("超出窗口限制")
+            reasons.append("Exceeded window limit")
             
         # 检查漏桶
         if water >= self.capacity:
             allowed = False
-            reasons.append("超出处理能力")
+            reasons.append("Exceeded processing capacity")
             
         # 如果允许请求，更新状态
         if allowed:

@@ -48,7 +48,7 @@ class RateLimiterCheckTool(Tool):
         }
         
         if algorithm_type not in algorithms:
-            raise ValueError(f"不支持的算法类型: {algorithm_type}")
+            raise ValueError(f"Unsupported algorithm type: {algorithm_type}")
             
         return algorithms[algorithm_type](storage=self.storage, **kwargs)
         
@@ -68,7 +68,7 @@ class RateLimiterCheckTool(Tool):
         }
         
         if storage_type not in storages:
-            raise ValueError(f"不支持的存储类型: {storage_type}")
+            raise ValueError(f"Unsupported storage type: {storage_type}")
             
         return storages[storage_type](**kwargs)
             
@@ -84,12 +84,12 @@ class RateLimiterCheckTool(Tool):
         required_fields = ["user_id", "action_type"]
         for field in required_fields:
             if not parameters.get(field):
-                raise ValueError(f"缺少必需参数: {field}")
+                raise ValueError(f"Missing required parameter: {field}")
                 
         if "algorithm_type" in parameters and parameters["algorithm_type"] not in [
             "token_bucket", "fixed_window", "sliding_window", "leaky_bucket", "multiple_buckets"
         ]:
-            raise ValueError("不支持的算法类型")
+            raise ValueError("Unsupported algorithm type")
             
     def _invoke(self, parameters: Dict[str, Any]) -> Generator[ToolInvokeMessage, None, None]:
         """执行工具调用
@@ -154,4 +154,4 @@ class RateLimiterCheckTool(Tool):
             })
             
         except Exception as e:
-            yield self.create_text_message(f"执行失败: {str(e)}")
+            yield self.create_text_message(f"Execution failed: {str(e)}")
