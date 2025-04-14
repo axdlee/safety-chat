@@ -147,11 +147,10 @@ class RateLimiterCheckTool(Tool):
             result = self.algorithm.check(key)
             
             # 返回结果
-            yield self.create_json_message({
-                "allowed": result["allowed"],
-                "remaining": result["remaining"],
-                "reset_time": result["reset_time"]
-            })
+            yield self.create_variable_message("allowed", result["allowed"])
+            yield self.create_variable_message("remaining", result["remaining"])
+            yield self.create_variable_message("reset_time", result["reset_time"])
+            
             
         except Exception as e:
             yield self.create_text_message(f"Execution failed: {str(e)}")

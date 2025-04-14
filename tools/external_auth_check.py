@@ -208,7 +208,7 @@ class ExternalAuthCheckTool(Tool):
         except Exception:
             return False
             
-    def _extract_user_info(self, response_data: Any, extract_method: str, pattern: str) -> Any:
+    def _extract_user_info(self, response_data: Any, extract_method: str, pattern: str) -> str:
         """提取用户信息
         
         Args:
@@ -217,24 +217,31 @@ class ExternalAuthCheckTool(Tool):
             pattern: 提取模式
             
         Returns:
-            Any: 提取的用户信息
+            str: 提取的用户信息(字符串形式)
         """
         try:
             if extract_method == "json_path":
                 if isinstance(response_data, str):
                     response_data = json.loads(response_data)
-                return self._get_json_value(response_data, pattern)
+                extracted_value = self._get_json_value(response_data, pattern)
             else:  # regex
                 if isinstance(response_data, (dict, list)):
                     response_text = json.dumps(response_data)
                 else:
                     response_text = str(response_data)
                 match = re.search(pattern, response_text)
-                if match:
-                    return match.group(1) if match.groups() else match.group(0)
-                return None
+                extracted_value = match.group(1) if match and match.groups() else match.group(0) if match else None
+            
+            # 将提取的值转换为字符串
+            if extracted_value is None:
+                return ""
+            elif isinstance(extracted_value, (dict, list)):
+                return json.dumps(extracted_value, ensure_ascii=False)
+            else:
+                return str(extracted_value)
+                
         except Exception:
-            return None
+            return ""
             
     def _invoke(self, parameters: Dict[str, Any]) -> Generator[ToolInvokeMessage, None, None]:
         """执行工具调用
@@ -296,10 +303,8 @@ class ExternalAuthCheckTool(Tool):
                 )
                 
             # 返回结果
-            yield self.create_json_message({
-                "authenticated": authenticated,
-                "user_info": user_info
-            })
+            yield self.create_variable_message("authenticated", authenticated)
+            yield self.create_variable_message("user_info", user_info)
             
         except Exception as e:
             yield self.create_text_message(f"Execution failed: {str(e)}") 

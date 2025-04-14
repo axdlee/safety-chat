@@ -237,7 +237,7 @@ parameters:
 output_schema:
   $schema: http://json-schema.org/draft-07/schema#
   type: object
-  required: ["authenticated"]
+  required: ["authenticated", "user_info"]
   additionalProperties: false
   properties:
     authenticated:
@@ -245,11 +245,6 @@ output_schema:
       title: Authenticated
       description: Whether the user is authenticated
     user_info:
-      type:
-        - string
-        - number
-        - object
-        - array
-        - "null"
+      type: string
       title: User Info
       description: Extracted user information from the response
