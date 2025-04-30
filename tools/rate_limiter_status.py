@@ -2,7 +2,7 @@ from typing import Any, Generator, Dict
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 from tools.base.rate_limiter_base import RateLimiterMixin
-from storage.storage import Storage, RedisStorage, PluginPersistentStorage
+from storage.storage import PluginPersistentStorage
 from utils.rate_limiter_algorithms import RateLimiterAlgorithm
 
 class RateLimiterStatusTool(Tool, RateLimiterMixin):
@@ -69,10 +69,7 @@ class RateLimiterStatusTool(Tool, RateLimiterMixin):
             # 初始化算法
             self.algorithm = self.get_algorithm(
                 algorithm_type=config.get(RateLimiterAlgorithm.ALGORITHM_TYPE_KEY),
-                rate=config.get(RateLimiterAlgorithm.RATE_KEY),
-                capacity=config.get(RateLimiterAlgorithm.CAPACITY_KEY),
-                max_requests=config.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY),
-                window_size=config.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY)
+                **{k: v for k, v in config.items() if k != RateLimiterAlgorithm.ALGORITHM_TYPE_KEY and k != RateLimiterAlgorithm.ACTION_TYPE_KEY}
             )
             
             # 执行状态查询
@@ -95,47 +92,3 @@ class RateLimiterStatusTool(Tool, RateLimiterMixin):
             
         except Exception as e:
             yield self.create_text_message(f"Execution failed: {str(e)}")
-
-    def _get_storage(self, storage_type: str, **kwargs) -> Any:
-        """获取存储实例
-        
-        Args:
-            storage_type: 存储类型
-            **kwargs: 存储配置
-            
-        Returns:
-            存储实例
-        """
-        storages = {
-            Storage.REDIS_STORAGE_TYPE: RedisStorage,
-            Storage.PLUGIN_STORAGE_TYPE: PluginPersistentStorage
-        }
-        
-        if storage_type not in storages:
-            raise ValueError(f"Unsupported storage type: {storage_type}")
-            
-        return storages[storage_type](**kwargs)
-        
-    def get_algorithm(self, algorithm_type: str = None, **kwargs) -> Any:
-        """获取限流算法实例
-        
-        Args:
-            algorithm_type: 算法类型，如果为 None 则使用默认配置
-            **kwargs: 算法参数，如果提供则覆盖默认配置
-            
-        Returns:
-            限流算法实例
-            
-        Raises:
-            ValueError: 不支持的算法类型
-        """
-        # 获取算法类型
-        if algorithm_type is None:
-            algorithm_type = self.runtime.credentials.get(RateLimiterAlgorithm.ALGORITHM_TYPE_KEY, RateLimiterAlgorithm.TOKEN_BUCKET_ALGORITHM)
-            
-        # 验证算法类型
-        if algorithm_type not in self.ALGORITHM_MAP:
-            raise ValueError(f"Unsupported algorithm type: {algorithm_type}")
-            
-        # 创建算法实例
-        return self.ALGORITHM_MAP[algorithm_type](storage=self.storage, **kwargs) 

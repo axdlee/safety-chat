@@ -119,10 +119,29 @@ class RateLimiterMixin:
         # 验证算法类型
         if algorithm_type not in self.ALGORITHM_MAP:
             raise ValueError(f"Unsupported algorithm type: {algorithm_type}")
-        
-        # 不同算法类型初始化参数
-        algorithm_params = self._get_algorithm_params(algorithm_type, **kwargs)
             
+        # 根据算法类型构建参数
+        algorithm_params = {}
+        if algorithm_type in [RateLimiterAlgorithm.TOKEN_BUCKET_ALGORITHM, RateLimiterAlgorithm.LEAKY_BUCKET_ALGORITHM]:
+            algorithm_params = {
+                RateLimiterAlgorithm.RATE_KEY: kwargs.get(RateLimiterAlgorithm.RATE_KEY),
+                RateLimiterAlgorithm.CAPACITY_KEY: kwargs.get(RateLimiterAlgorithm.CAPACITY_KEY)
+            }
+        elif algorithm_type in [RateLimiterAlgorithm.FIXED_WINDOW_ALGORITHM, RateLimiterAlgorithm.SLIDING_WINDOW_ALGORITHM]:
+            algorithm_params = {
+                RateLimiterAlgorithm.MAX_REQUESTS_KEY: kwargs.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY),
+                RateLimiterAlgorithm.WINDOW_SIZE_KEY: kwargs.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY)
+            }
+        elif algorithm_type == RateLimiterAlgorithm.MULTIPLE_BUCKETS_ALGORITHM:
+            algorithm_params = {
+                RateLimiterAlgorithm.RATE_KEY: kwargs.get(RateLimiterAlgorithm.RATE_KEY),
+                RateLimiterAlgorithm.CAPACITY_KEY: kwargs.get(RateLimiterAlgorithm.CAPACITY_KEY),
+                RateLimiterAlgorithm.MAX_REQUESTS_KEY: kwargs.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY),
+                RateLimiterAlgorithm.WINDOW_SIZE_KEY: kwargs.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY)
+            }
+            
+        # 过滤掉 None 值
+        algorithm_params = {k: v for k, v in algorithm_params.items() if v is not None}
         # 创建算法实例
         return self.ALGORITHM_MAP[algorithm_type](storage=self.storage, **algorithm_params)
         
@@ -143,24 +162,6 @@ class RateLimiterMixin:
                 Storage.REDIS_DB_KEY: int(credentials.get(Storage.REDIS_DB_KEY, "0"))
             }
             self.storage = self._get_storage(storage_type, **storage_config)
-            
-    def _get_algorithm_params(self, algorithm_type: str, **kwargs) -> dict:
-        """获取算法参数配置
-        
-        Args:
-            algorithm_type: 算法类型
-            **kwargs: 覆盖参数
-            
-        Returns:
-            dict: 算法参数配置
-        """
-        params = self.ALGORITHM_PARAMS[algorithm_type].copy()
-        
-        # 从运行时配置获取默认值
-        for key in params:
-            params[key] = kwargs.get(key, self.runtime.credentials.get(key, params[key]))
-            
-        return params
         
     def init_config(self, unique_id: str, parameters: Dict[str, Any]) -> None:
         """初始化配置

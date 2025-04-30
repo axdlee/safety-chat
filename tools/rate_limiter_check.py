@@ -69,10 +69,7 @@ class RateLimiterCheckTool(Tool, RateLimiterMixin):
             # 初始化算法
             self.algorithm = self.get_algorithm(
                 algorithm_type=parameters.get(RateLimiterAlgorithm.ALGORITHM_TYPE_KEY),
-                rate=parameters.get(RateLimiterAlgorithm.RATE_KEY),
-                capacity=parameters.get(RateLimiterAlgorithm.CAPACITY_KEY),
-                max_requests=parameters.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY),
-                window_size=parameters.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY)
+                **{k: v for k, v in parameters.items() if k != RateLimiterAlgorithm.ALGORITHM_TYPE_KEY}
             )
             
             # 执行限流检查
@@ -89,23 +86,3 @@ class RateLimiterCheckTool(Tool, RateLimiterMixin):
             
         except Exception as e:
             yield self.create_text_message(f"Execution failed: {str(e)}")
-
-    def _get_storage(self, storage_type: str, **kwargs) -> Any:
-        """获取存储实例
-        
-        Args:
-            storage_type: 存储类型
-            **kwargs: 存储配置
-            
-        Returns:
-            存储实例
-        """
-        storages = {
-            Storage.REDIS_STORAGE_TYPE: RedisStorage,
-            Storage.PLUGIN_STORAGE_TYPE: PluginPersistentStorage
-        }
-        
-        if storage_type not in storages:
-            raise ValueError(f"Unsupported storage type: {storage_type}")
-            
-        return storages[storage_type](**kwargs)
