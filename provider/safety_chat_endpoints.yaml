@@ -1,0 +1,29 @@
+settings:
+  - name: unique_id
+    type: string
+    required: true
+    label:
+      en_US: Unique ID
+      zh_Hans: 唯一标识
+    help:
+      en_US: The unique identifier for the rate limit configuration, used to distinguish different rate limit configurations
+      zh_Hans: 频率限制的唯一标识, 用于分区分不同的频率限制配置
+    human_description:
+      en_US: Please provide the unique identifier for rate limit configuration
+      zh_Hans: 请提供需要进行频率限制配置的唯一标识
+    llm_description: The unique identifier to check rate limit against
+  - name: user_id
+    type: string
+    required: true
+    label:
+      en_US: User ID
+      zh_Hans: 用户ID
+    help:
+      en_US: The ID of the user making the request
+      zh_Hans: 发起请求的用户ID
+    human_description:
+      en_US: Please provide the user ID for rate limit checking
+      zh_Hans: 请提供需要进行频率限制检查的用户ID
+    llm_description: The user identifier to check rate limit against
+endpoints:
+  - endpoints/rate_limit_status.yaml

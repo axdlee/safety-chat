@@ -32,6 +32,22 @@ class RateLimiterAlgorithm(ABC):
             }
         """
         pass
+        
+    @abstractmethod
+    def get_status(self, key: str) -> Dict[str, Any]:
+        """获取当前限流状态
+        
+        Args:
+            key: 限流键
+            
+        Returns:
+            Dict[str, Any]: {
+                "allowed": str,  # 是否允许请求("true"/"false")
+                "remaining": int,  # 剩余请求数
+                "reset_time": int  # 重置时间戳
+            }
+        """
+        pass
 
 class TokenBucketAlgorithm(RateLimiterAlgorithm):
     """令牌桶算法
@@ -46,40 +62,51 @@ class TokenBucketAlgorithm(RateLimiterAlgorithm):
         self.capacity = capacity  # 桶容量
         
     def check(self, key: str, **kwargs) -> Dict[str, Any]:
-        storage_key = f"{self.KEY_PREFIX}:token_bucket:{key}"
-        now = time.time()
-        
         # 获取当前状态
+        status = self.get_status(key)
+        
+        # 如果允许请求，更新状态
+        if status["allowed"] == "true":
+            storage_key = f"{self.KEY_PREFIX}:token_bucket:{key}"
+            now = time.time()
+            
+            # 更新令牌数
+            data = self.storage.get(storage_key) or {
+                "tokens": self.capacity,
+                "last_refill": now
+            }
+            
+            time_passed = now - data["last_refill"]
+            tokens = min(self.capacity, data["tokens"] + time_passed * self.rate)
+            tokens -= 1  # 消耗一个令牌
+            
+            # 更新状态
+            new_data = {
+                "tokens": tokens,
+                "last_refill": now
+            }
+            
+            # 设置过期时间为下次重置时间
+            expire = int(1 / self.rate)
+            self.storage.set(storage_key, new_data, expire=expire)
+            
+        return status
+
+    def get_status(self, key: str) -> Dict[str, Any]:
+        storage_key = f"{self.KEY_PREFIX}:token_bucket:{key}"
         data = self.storage.get(storage_key) or {
             "tokens": self.capacity,
-            "last_refill": now
+            "last_refill": time.time()
         }
         
-        # 计算令牌补充
-        time_passed = now - data["last_refill"]
+        # 计算当前令牌数
+        time_passed = time.time() - data["last_refill"]
         tokens = min(self.capacity, data["tokens"] + time_passed * self.rate)
         
-        # 检查限流
-        if tokens >= 1:
-            tokens -= 1
-            allowed = "true"
-        else:
-            allowed = "false"
-            
-        # 更新状态
-        new_data = {
-            "tokens": tokens,
-            "last_refill": now
-        }
-        
-        # 设置过期时间为下次重置时间
-        expire = int(1 / self.rate)
-        self.storage.set(storage_key, new_data, expire=expire)
-        
         return {
-            "allowed": allowed,
+            "allowed": "true" if tokens >= 1 else "false",
             "remaining": int(tokens),
-            "reset_time": int(now + expire)
+            "reset_time": int(time.time() + (1 / self.rate))
         }
 
 class FixedWindowAlgorithm(RateLimiterAlgorithm):
@@ -95,31 +122,49 @@ class FixedWindowAlgorithm(RateLimiterAlgorithm):
         self.window_size = window_size  # 窗口大小(秒)
         
     def check(self, key: str, **kwargs) -> Dict[str, Any]:
-        storage_key = f"{self.KEY_PREFIX}:fixed_window:{key}"
-        now = int(time.time())
-        window_start = now - (now % self.window_size)
+        # 获取当前状态
+        status = self.get_status(key)
         
-        # 获取当前窗口数据
-        data = self.storage.get(storage_key)
-        if not data or data["start"] != window_start:
-            data = {
+        # 如果允许请求，更新状态
+        if status["allowed"] == "true":
+            storage_key = f"{self.KEY_PREFIX}:fixed_window:{key}"
+            now = int(time.time())
+            window_start = now - (now % self.window_size)
+            
+            # 更新计数
+            data = self.storage.get(storage_key) or {
                 "start": window_start,
                 "count": 0
             }
             
-        # 更新计数
-        data["count"] += 1
+            if data["start"] != window_start:
+                data = {
+                    "start": window_start,
+                    "count": 0
+                }
+                
+            data["count"] += 1
+            
+            # 更新状态
+            expire = window_start + self.window_size - now
+            self.storage.set(storage_key, data, expire=expire)
+            
+        return status
+
+    def get_status(self, key: str) -> Dict[str, Any]:
+        storage_key = f"{self.KEY_PREFIX}:fixed_window:{key}"
+        now = int(time.time())
+        window_start = now - (now % self.window_size)
         
-        # 检查限流
-        allowed = "true" if data["count"] <= self.max_requests else "false"
-        
-        # 更新状态
-        expire = window_start + self.window_size - now
-        self.storage.set(storage_key, data, expire=expire)
-        
+        data = self.storage.get(storage_key)
+        if not data or data["start"] != window_start:
+            count = 0
+        else:
+            count = data["count"]
+            
         return {
-            "allowed": allowed,
-            "remaining": max(0, self.max_requests - data["count"]),
+            "allowed": "true" if count < self.max_requests else "false",
+            "remaining": max(0, self.max_requests - count),
             "reset_time": window_start + self.window_size
         }
 
@@ -136,33 +181,37 @@ class SlidingWindowAlgorithm(RateLimiterAlgorithm):
         self.window_size = window_size  # 窗口大小(秒)
         
     def check(self, key: str, **kwargs) -> Dict[str, Any]:
+        # 获取当前状态
+        status = self.get_status(key)
+        
+        # 如果允许请求，更新状态
+        if status["allowed"] == "true":
+            storage_key = f"{self.KEY_PREFIX}:sliding_window:{key}"
+            now = time.time()
+            
+            # 更新请求记录
+            data = self.storage.get(storage_key) or {"requests": []}
+            window_start = now - self.window_size
+            data["requests"] = [t for t in data["requests"] if t > window_start]
+            data["requests"].append(now)
+            
+            # 更新状态
+            self.storage.set(storage_key, data, expire=self.window_size)
+            
+        return status
+
+    def get_status(self, key: str) -> Dict[str, Any]:
         storage_key = f"{self.KEY_PREFIX}:sliding_window:{key}"
         now = time.time()
         
-        # 获取请求时间戳列表
         data = self.storage.get(storage_key) or {"requests": []}
-        
-        # 清理过期的请求
         window_start = now - self.window_size
-        data["requests"] = [t for t in data["requests"] if t > window_start]
-        
-        # 检查限流
-        if len(data["requests"]) < self.max_requests:
-            data["requests"].append(now)
-            allowed = "true"
-        else:
-            allowed = "false"
-            
-        # 更新状态
-        self.storage.set(storage_key, data, expire=self.window_size)
-        
-        # 计算重置时间
-        reset_time = data["requests"][0] + self.window_size if data["requests"] else now + self.window_size
+        requests = [t for t in data["requests"] if t > window_start]
         
         return {
-            "allowed": allowed,
-            "remaining": self.max_requests - len(data["requests"]),
-            "reset_time": int(reset_time)
+            "allowed": "true" if len(requests) < self.max_requests else "false",
+            "remaining": max(0, self.max_requests - len(requests)),
+            "reset_time": int(requests[0] + self.window_size if requests else now + self.window_size)
         }
 
 class LeakyBucketAlgorithm(RateLimiterAlgorithm):
@@ -178,38 +227,51 @@ class LeakyBucketAlgorithm(RateLimiterAlgorithm):
         self.capacity = capacity  # 桶容量
         
     def check(self, key: str, **kwargs) -> Dict[str, Any]:
+        # 获取当前状态
+        status = self.get_status(key)
+        
+        # 如果允许请求，更新状态
+        if status["allowed"] == "true":
+            storage_key = f"{self.KEY_PREFIX}:leaky_bucket:{key}"
+            now = time.time()
+            
+            # 更新水量
+            data = self.storage.get(storage_key) or {
+                "water": 0,
+                "last_leak": now
+            }
+            
+            time_passed = now - data["last_leak"]
+            water = max(0, data["water"] - time_passed * self.rate)
+            water += 1  # 增加水量
+            
+            # 更新状态
+            new_data = {
+                "water": water,
+                "last_leak": now
+            }
+            
+            # 设置过期时间
+            expire = int(water / self.rate)
+            self.storage.set(storage_key, new_data, expire=expire)
+            
+        return status
+
+    def get_status(self, key: str) -> Dict[str, Any]:
         storage_key = f"{self.KEY_PREFIX}:leaky_bucket:{key}"
         now = time.time()
         
-        # 获取当前状态
         data = self.storage.get(storage_key) or {
             "water": 0,
             "last_leak": now
         }
         
-        # 计算漏出的水量
+        # 计算当前水量
         time_passed = now - data["last_leak"]
         water = max(0, data["water"] - time_passed * self.rate)
         
-        # 检查是否可以加水
-        if water < self.capacity:
-            water += 1
-            allowed = "true"
-        else:
-            allowed = "false"
-            
-        # 更新状态
-        new_data = {
-            "water": water,
-            "last_leak": now
-        }
-        
-        # 设置过期时间
-        expire = int(water / self.rate)
-        self.storage.set(storage_key, new_data, expire=expire)
-        
         return {
-            "allowed": allowed,
+            "allowed": "true" if water < self.capacity else "false",
             "remaining": int(self.capacity - water),
             "reset_time": int(now + (1 / self.rate))
         }
@@ -242,87 +304,89 @@ class MultipleBucketsAlgorithm(RateLimiterAlgorithm):
         self.window_size = window_size
         
     def check(self, key: str, **kwargs) -> Dict[str, Any]:
+        # 获取当前状态
+        status = self.get_status(key)
+        
+        # 如果允许请求，更新状态
+        if status["allowed"] == "true":
+            storage_key = f"{self.KEY_PREFIX}:multiple_buckets:{key}"
+            now = time.time()
+            
+            # 获取当前状态
+            data = self.storage.get(storage_key) or {
+                "tokens": self.capacity,
+                "last_refill": now,
+                "requests": [],
+                "water": 0,
+                "last_leak": now
+            }
+            
+            # 更新令牌桶状态
+            time_passed = now - data["last_refill"]
+            tokens = min(self.capacity, data["tokens"] + time_passed * self.rate)
+            tokens -= 1  # 消耗一个令牌
+            
+            # 更新滑动窗口状态
+            window_start = now - self.window_size
+            data["requests"] = [t for t in data["requests"] if t > window_start]
+            data["requests"].append(now)
+            
+            # 更新漏桶状态
+            leaked = (now - data["last_leak"]) * self.rate
+            water = max(0, data["water"] - leaked)
+            water += 1  # 增加水量
+            
+            # 更新状态
+            new_data = {
+                "tokens": tokens,
+                "last_refill": now,
+                "requests": data["requests"],
+                "water": water,
+                "last_leak": now
+            }
+            
+            # 设置过期时间为窗口大小
+            self.storage.set(storage_key, new_data, expire=self.window_size)
+            
+        return status
+
+    def get_status(self, key: str) -> Dict[str, Any]:
         storage_key = f"{self.KEY_PREFIX}:multiple_buckets:{key}"
         now = time.time()
         
-        # 获取当前状态
         data = self.storage.get(storage_key) or {
-            "tokens": self.capacity,  # 令牌桶当前令牌数
-            "last_refill": now,      # 上次补充令牌时间
-            "requests": [],          # 请求历史记录
-            "water": 0,             # 漏桶当前水量
-            "last_leak": now        # 上次漏水时间
-        }
-        
-        # 1. 令牌桶算法: 补充令牌
-        time_passed = now - data["last_refill"]
-        tokens = min(self.capacity, data["tokens"] + time_passed * self.rate)
-        
-        # 2. 滑动窗口: 清理过期请求
-        window_start = now - self.window_size
-        data["requests"] = [t for t in data["requests"] if t > window_start]
-        
-        # 3. 漏桶算法: 计算漏出的水量
-        leaked = (now - data["last_leak"]) * self.rate
-        water = max(0, data["water"] - leaked)
-        
-        # 综合判断是否允许请求
-        allowed = "true"
-        reasons = []
-        
-        # 检查令牌桶
-        if tokens < 1:
-            allowed = "false"
-            reasons.append("Token not enough")
-            
-        # 检查滑动窗口
-        if len(data["requests"]) >= self.max_requests:
-            allowed = "false"
-            reasons.append("Exceeded window limit")
-            
-        # 检查漏桶
-        if water >= self.capacity:
-            allowed = "false"
-            reasons.append("Exceeded processing capacity")
-            
-        # 如果允许请求，更新状态
-        if allowed == "true":
-            # 消耗令牌
-            tokens -= 1
-            # 记录请求
-            data["requests"].append(now)
-            # 加水
-            water += 1
-            
-        # 更新状态
-        new_data = {
-            "tokens": tokens,
+            "tokens": self.capacity,
             "last_refill": now,
-            "requests": data["requests"],
-            "water": water,
+            "requests": [],
+            "water": 0,
             "last_leak": now
         }
         
+        # 计算令牌桶状态
+        time_passed = now - data["last_refill"]
+        tokens = min(self.capacity, data["tokens"] + time_passed * self.rate)
+        
+        # 计算滑动窗口状态
+        window_start = now - self.window_size
+        requests = [t for t in data["requests"] if t > window_start]
+        
+        # 计算漏桶状态
+        leaked = (now - data["last_leak"]) * self.rate
+        water = max(0, data["water"] - leaked)
+        
         # 计算重置时间
         reset_times = []
-        # 令牌桶重置时间
         if tokens < self.capacity:
             reset_times.append(now + (self.capacity - tokens) / self.rate)
-        # 滑动窗口重置时间
-        if data["requests"]:
-            reset_times.append(data["requests"][0] + self.window_size)
-        # 漏桶重置时间
+        if requests:
+            reset_times.append(requests[0] + self.window_size)
         if water > 0:
             reset_times.append(now + water / self.rate)
             
         reset_time = min(reset_times) if reset_times else now + self.window_size
         
-        # 设置过期时间为窗口大小
-        self.storage.set(storage_key, new_data, expire=self.window_size)
-        
         return {
-            "allowed": allowed,
-            "remaining": min(int(tokens), self.max_requests - len(data["requests"]), int(self.capacity - water)),
-            "reset_time": int(reset_time),
-            "reasons": reasons if allowed == "false" else None
+            "allowed": "true" if tokens >= 1 and len(requests) < self.max_requests and water < self.capacity else "false",
+            "remaining": min(int(tokens), self.max_requests - len(requests), int(self.capacity - water)),
+            "reset_time": int(reset_time)
         } 

@@ -22,6 +22,21 @@ extra:
     source: tools/rate_limiter_check.py
 
 parameters:
+  - name: unique_id
+    type: string
+    required: true
+    label:
+      en_US: Unique ID
+      zh_Hans: 唯一标识
+    help:
+      en_US: The unique identifier for the rate limit configuration, used to save and distinguish different rate limit configurations
+      zh_Hans: 频率限制的唯一标识, 用于分别保存并区分不同的频率限制配置
+    human_description:
+      en_US: Please provide the unique identifier for rate limit configuration
+      zh_Hans: 请提供需要进行频率限制配置的唯一标识
+    llm_description: The unique identifier to check rate limit against
+    form: llm
+
   - name: user_id
     type: string
     required: true
