@@ -2,45 +2,37 @@ from typing import Mapping
 from werkzeug import Request, Response
 from dify_plugin import Endpoint
 from flask import jsonify
-from tools.rate_limiter_check import RateLimiterCheckTool
+from utils.rate_limiter_algorithms import RateLimiterAlgorithm
 
 class RateLimitStatusEndpoint(Endpoint):
     def _invoke(self, r: Request, values: Mapping, settings: Mapping) -> Response:
         # 获取请求参数
-        user_id = r.args.get('user_id')
-        unique_id = r.args.get('unique_id')
+        user_id = r.args.get(RateLimiterAlgorithm.USER_ID_KEY)
+        unique_id = r.args.get(RateLimiterAlgorithm.UNIQUE_ID_KEY)
         if not user_id or not unique_id:
             return jsonify({
-                'error': 'Missing required parameters: user_id and unique_id'
+                'error': f'Missing required parameters: {RateLimiterAlgorithm.USER_ID_KEY} and {RateLimiterAlgorithm.UNIQUE_ID_KEY}'
             }), 400
             
         try:
-            config = self.session.tool.invoke_builtin_tool("axdlee/safety_chat", "rate_limiter_check", {
-                "unique_id": unique_id,
-                "user_id": user_id
+            rate_limiter_status = self.session.tool.invoke_builtin_tool("axdlee/safety_chat", "rate_limiter_status", {
+                RateLimiterAlgorithm.UNIQUE_ID_KEY: unique_id,
+                RateLimiterAlgorithm.USER_ID_KEY: user_id
             })
-            parameters = {
-                "algorithm_type": config.get('algorithm_type'),
-                "rate": config.get('rate'),
-                "capacity": config.get('capacity'),
-                "max_requests": config.get('max_requests'),
-                "window_size": config.get('window_size')
-            }
-            algorithm = self.session.tool.invoke_builtin_tool("axdlee/safety_chat", "rate_limiter_check", parameters)
-            
-            # 生成限流 key
-            key = f"{user_id}:{action_type}"
-            
-            # 获取状态
-            status = algorithm.get_status(key)
             
             return jsonify({
-                'user_id': user_id,
-                'action_type': action_type,
-                'algorithm_type': settings.get('algorithm_type'),
-                'allowed': status['allowed'],
-                'remaining': status['remaining'],
-                'reset_time': status['reset_time']
+                RateLimiterAlgorithm.ALLOWED_KEY: rate_limiter_status.get(RateLimiterAlgorithm.ALLOWED_KEY),
+                RateLimiterAlgorithm.REMAINING_KEY: rate_limiter_status.get(RateLimiterAlgorithm.REMAINING_KEY),
+                RateLimiterAlgorithm.RESET_TIME_KEY: rate_limiter_status.get(RateLimiterAlgorithm.RESET_TIME_KEY),
+                RateLimiterAlgorithm.ALGORITHM_TYPE_KEY: rate_limiter_status.get(RateLimiterAlgorithm.ALGORITHM_TYPE_KEY),
+                RateLimiterAlgorithm.ACTION_TYPE_KEY: rate_limiter_status.get(RateLimiterAlgorithm.ACTION_TYPE_KEY),
+                RateLimiterAlgorithm.RATE_KEY: rate_limiter_status.get(RateLimiterAlgorithm.RATE_KEY),
+                RateLimiterAlgorithm.CAPACITY_KEY: rate_limiter_status.get(RateLimiterAlgorithm.CAPACITY_KEY),
+                RateLimiterAlgorithm.MAX_REQUESTS_KEY: rate_limiter_status.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY),
+                RateLimiterAlgorithm.WINDOW_SIZE_KEY: rate_limiter_status.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY),
+                RateLimiterAlgorithm.REASON_KEY: rate_limiter_status.get(RateLimiterAlgorithm.REASON_KEY),
+                RateLimiterAlgorithm.REASON_CN_KEY: rate_limiter_status.get(RateLimiterAlgorithm.REASON_CN_KEY),
+                RateLimiterAlgorithm.REASON_CODE_KEY: rate_limiter_status.get(RateLimiterAlgorithm.REASON_CODE_KEY)
             }), 200
             
         except Exception as e:
