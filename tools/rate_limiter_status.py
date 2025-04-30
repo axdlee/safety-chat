@@ -81,6 +81,9 @@ class RateLimiterStatusTool(RateLimiterBaseTool):
             yield self.create_variable_message(RateLimiterAlgorithm.CAPACITY_KEY, config.get(RateLimiterAlgorithm.CAPACITY_KEY))
             yield self.create_variable_message(RateLimiterAlgorithm.MAX_REQUESTS_KEY, config.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY))
             yield self.create_variable_message(RateLimiterAlgorithm.WINDOW_SIZE_KEY, config.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY))
+            yield self.create_variable_message(RateLimiterAlgorithm.REASON_KEY, result[RateLimiterAlgorithm.REASON_KEY])
+            yield self.create_variable_message(RateLimiterAlgorithm.REASON_CN_KEY, result[RateLimiterAlgorithm.REASON_CN_KEY])
+            yield self.create_variable_message(RateLimiterAlgorithm.REASON_CODE_KEY, result[RateLimiterAlgorithm.REASON_CODE_KEY])
             
         except Exception as e:
             yield self.create_text_message(f"Execution failed: {str(e)}")

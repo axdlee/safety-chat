@@ -75,6 +75,9 @@ class RateLimiterCheckTool(RateLimiterBaseTool):
             yield self.create_variable_message(RateLimiterAlgorithm.ALLOWED_KEY, result[RateLimiterAlgorithm.ALLOWED_KEY])
             yield self.create_variable_message(RateLimiterAlgorithm.REMAINING_KEY, result[RateLimiterAlgorithm.REMAINING_KEY])
             yield self.create_variable_message(RateLimiterAlgorithm.RESET_TIME_KEY, result[RateLimiterAlgorithm.RESET_TIME_KEY])
+            yield self.create_variable_message(RateLimiterAlgorithm.REASON_KEY, result[RateLimiterAlgorithm.REASON_KEY])
+            yield self.create_variable_message(RateLimiterAlgorithm.REASON_CN_KEY, result[RateLimiterAlgorithm.REASON_CN_KEY])
+            yield self.create_variable_message(RateLimiterAlgorithm.REASON_CODE_KEY, result[RateLimiterAlgorithm.REASON_CODE_KEY])
             
         except Exception as e:
             yield self.create_text_message(f"Execution failed: {str(e)}")
