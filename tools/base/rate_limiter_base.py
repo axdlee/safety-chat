@@ -1,5 +1,5 @@
 from typing import Any, Dict
-from dify_plugin import Tool
+from abc import ABC, abstractmethod
 from utils.rate_limiter_algorithms import (
     TokenBucketAlgorithm,
     FixedWindowAlgorithm,
@@ -10,8 +10,8 @@ from utils.rate_limiter_algorithms import (
 )
 from storage.storage import Storage, RedisStorage, PluginPersistentStorage
 
-class RateLimiterBaseTool(Tool):
-    """频率限制工具基类
+class RateLimiterMixin:
+    """频率限制工具 Mixin
     
     提供频率限制相关的公共功能。
     """
@@ -60,11 +60,13 @@ class RateLimiterBaseTool(Tool):
             runtime: 运行时环境
             session: 会话信息
         """
-        super().__init__(runtime=runtime, session=session)
+        self.runtime = runtime
+        self.session = session
         self.algorithm = None
         # 使用插件持久化存储
         self.storage = PluginPersistentStorage(self.session.storage)
         
+    @abstractmethod
     def validate_parameters(self, parameters: Dict[str, Any], required_fields: list) -> None:
         """验证参数
         
@@ -75,10 +77,8 @@ class RateLimiterBaseTool(Tool):
         Raises:
             ValueError: 参数验证失败
         """
-        for field in required_fields:
-            if not parameters.get(field):
-                raise ValueError(f"Missing required parameter: {field}")
-                
+        pass
+        
     def _get_storage(self, storage_type: str, **kwargs) -> Any:
         """获取存储实例
         
@@ -119,9 +119,12 @@ class RateLimiterBaseTool(Tool):
         # 验证算法类型
         if algorithm_type not in self.ALGORITHM_MAP:
             raise ValueError(f"Unsupported algorithm type: {algorithm_type}")
+        
+        # 不同算法类型初始化参数
+        algorithm_params = self._get_algorithm_params(algorithm_type, **kwargs)
             
         # 创建算法实例
-        return self.ALGORITHM_MAP[algorithm_type](storage=self.storage, **kwargs)
+        return self.ALGORITHM_MAP[algorithm_type](storage=self.storage, **algorithm_params)
         
     def init_storage(self) -> None:
         """初始化存储

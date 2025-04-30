@@ -64,20 +64,20 @@ class RedisStorage(Storage):
     使用Redis作为存储后端,支持数据持久化和过期时间设置。
     """
     
-    def __init__(self, host: str = "localhost", port: int = 6379, db: int = 0, password: Optional[str] = None):
+    def __init__(self, redis_host: str = "localhost", redis_port: int = 6379, redis_db: int = 0, redis_password: Optional[str] = None):
         """初始化Redis存储
         
         Args:
-            host: Redis主机地址
-            port: Redis端口
-            db: Redis数据库编号
-            password: Redis密码
+            redis_host: Redis主机地址
+            redis_port: Redis端口
+            redis_db: Redis数据库编号
+            redis_password: Redis密码
         """
         self.redis = redis.Redis(
-            host=host,
-            port=port,
-            db=db,
-            password=password,
+            host=redis_host,
+            port=redis_port,
+            db=redis_db,
+            password=redis_password,
             decode_responses=False  # 修改为False以支持bytes存储
         )
         

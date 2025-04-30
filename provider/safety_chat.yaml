@@ -18,6 +18,7 @@ extra:
 tools:
   - tools/rate_limiter_check.yaml
   - tools/external_auth_check.yaml
+  - tools/rate_limiter_status.yaml
 
 credentials_for_provider:
   storage_type:

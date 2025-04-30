@@ -1,10 +1,11 @@
 from typing import Any, Generator, Dict
+from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
-from tools.rate_limiter_base import RateLimiterBaseTool
+from tools.base.rate_limiter_base import RateLimiterMixin
 from storage.storage import Storage, RedisStorage, PluginPersistentStorage
 from utils.rate_limiter_algorithms import RateLimiterAlgorithm
 
-class RateLimiterStatusTool(RateLimiterBaseTool):
+class RateLimiterStatusTool(Tool, RateLimiterMixin):
     """频率限制状态查询工具
     
     查询特定用户和业务的频率限制状态。
@@ -18,21 +19,28 @@ class RateLimiterStatusTool(RateLimiterBaseTool):
             runtime: 运行时环境
             session: 会话信息
         """
-        super().__init__(runtime=runtime, session=session)
+        Tool.__init__(self, runtime=runtime, session=session)
+        RateLimiterMixin.__init__(self, runtime=runtime, session=session)
         self.algorithm = None
         # 使用插件持久化存储
         self.storage = PluginPersistentStorage(self.session.storage)
         
-    def validate_parameters(self, parameters: Dict[str, Any]) -> None:
+    def validate_parameters(self, parameters: Dict[str, Any], required_fields: list = None) -> None:
         """验证参数
         
         Args:
             parameters: 参数字典
+            required_fields: 必需字段列表
             
         Raises:
             ValueError: 参数验证失败
         """
-        super().validate_parameters(parameters, [RateLimiterAlgorithm.UNIQUE_ID_KEY, RateLimiterAlgorithm.USER_ID_KEY])
+        if required_fields is None:
+            required_fields = [RateLimiterAlgorithm.UNIQUE_ID_KEY, RateLimiterAlgorithm.USER_ID_KEY]
+            
+        for field in required_fields:
+            if not parameters.get(field):
+                raise ValueError(f"Missing required parameter: {field}")
                 
     def _invoke(self, parameters: Dict[str, Any]) -> Generator[ToolInvokeMessage, None, None]:
         """执行工具调用

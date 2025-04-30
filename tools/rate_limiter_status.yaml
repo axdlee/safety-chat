@@ -97,3 +97,15 @@ output_schema:
       type: integer
       title: Window Size
       description: Time window size in seconds
+    reason:
+      type: string
+      title: Reason
+      description: Reason for the rate limit check
+    reason_cn:
+      type: string
+      title: Reason (Chinese)
+      description: Reason for the rate limit check in Chinese
+    reason_code:
+      type: string
+      title: Reason Code
+      description: Reason code for the rate limit check
