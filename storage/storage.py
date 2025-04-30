@@ -7,6 +7,17 @@ import time
 class Storage(ABC):
     """存储基类"""
     
+    # 存储类型
+    STORAGE_TYPE_KEY = "storage_type"
+    PLUGIN_STORAGE_TYPE = "plugin_storage"
+    REDIS_STORAGE_TYPE = "redis"
+
+    # Redis 配置
+    REDIS_HOST_KEY = "redis_host"
+    REDIS_PORT_KEY = "redis_port"
+    REDIS_PASSWORD_KEY = "redis_password"
+    REDIS_DB_KEY = "redis_db"
+
     @abstractmethod
     def get(self, key: str) -> Optional[Dict[str, Any]]:
         """获取数据
