@@ -30,6 +30,7 @@ class RateLimiterAlgorithm(ABC):
     REMAINING_KEY = "remaining"
     RESET_TIME_KEY = "reset_time"
     REASON_KEY = "reason"
+    REASON_CN_KEY = "reason_cn"
     REASON_CODE_KEY = "reason_code"
 
     # 限流错误码
@@ -39,6 +40,27 @@ class RateLimiterAlgorithm(ABC):
     RATE_LIMIT_QUEUE_FULL = "rate_queue_full"  # 队列已满
     RATE_LIMIT_WINDOW_LIMIT = "rate_window"  # 时间窗口限制
     RATE_LIMIT_MULTIPLE = "rate_multi"  # 混合限制
+
+    # 文案模板
+    # 令牌桶算法
+    TOKEN_BUCKET_REASON_TEMPLATE = "System processing capacity is {rate} requests per second, please try again in {wait_time} seconds"
+    TOKEN_BUCKET_REASON_CN_TEMPLATE = "当前系统处理能力为每秒{rate}个请求，请{wait_time}秒后再试"
+
+    # 固定窗口算法
+    FIXED_WINDOW_REASON_TEMPLATE = "Maximum {max_requests} requests allowed in {time_value} {time_unit}, {count} used, please try again in {wait_time} seconds"
+    FIXED_WINDOW_REASON_CN_TEMPLATE = "当前{time_value}{time_unit}内最多允许{max_requests}次请求，已使用{count}次，请{wait_time}秒后再试"
+
+    # 滑动窗口算法
+    SLIDING_WINDOW_REASON_TEMPLATE = "Maximum {max_requests} requests allowed in {time_value} {time_unit}, {count} used, please try again in {wait_time} seconds"
+    SLIDING_WINDOW_REASON_CN_TEMPLATE = "当前{time_value}{time_unit}内最多允许{max_requests}次请求，已使用{count}次，请{wait_time}秒后再试"
+
+    # 漏桶算法
+    LEAKY_BUCKET_REASON_TEMPLATE = "System processing capacity is {rate} requests per second, queue is full, please try again in {wait_time} seconds"
+    LEAKY_BUCKET_REASON_CN_TEMPLATE = "当前系统处理能力为每秒{rate}个请求，队列已满，请{wait_time}秒后再试"
+
+    # 多级混合限流
+    MULTIPLE_BUCKETS_REASON_TEMPLATE = "System is busy, please try again in {wait_time} seconds"
+    MULTIPLE_BUCKETS_REASON_CN_TEMPLATE = "系统繁忙，请{wait_time}秒后再试"
 
     # 算法填充参数
     # 令牌桶算法
@@ -106,23 +128,113 @@ class RateLimiterAlgorithm(ABC):
         pass
 
     @staticmethod
-    def format_time_duration(seconds: int) -> Tuple[int, str]:
+    def format_time_duration(seconds: int, lang: str = "cn") -> Tuple[int, str]:
         """将秒数转换为更友好的时间描述
+        
+        Args:
+            seconds: 秒数
+            lang: 语言，可选 "cn" 或 "en"
+            
+        Returns:
+            Tuple[int, str]: (时间值, 时间单位)
+        """
+        if lang == "cn":
+            if seconds < 60:
+                return seconds, "秒"
+            elif seconds < 3600:
+                return seconds // 60, "分钟"
+            elif seconds < 86400:
+                return seconds // 3600, "小时"
+            else:
+                return seconds // 86400, "天"
+        else:
+            if seconds < 60:
+                return seconds, "second" if seconds == 1 else "seconds"
+            elif seconds < 3600:
+                minutes = seconds // 60
+                return minutes, "minute" if minutes == 1 else "minutes"
+            elif seconds < 86400:
+                hours = seconds // 3600
+                return hours, "hour" if hours == 1 else "hours"
+            else:
+                days = seconds // 86400
+                return days, "day" if days == 1 else "days"
+
+    def _get_time_descriptions(self, seconds: int) -> Dict[str, Tuple[int, str]]:
+        """获取中英文时间描述
         
         Args:
             seconds: 秒数
             
         Returns:
-            Tuple[int, str]: (时间值, 时间单位)
+            Dict[str, Tuple[int, str]]: 包含中英文时间描述的字典
         """
-        if seconds < 60:
-            return seconds, "秒"
-        elif seconds < 3600:
-            return seconds // 60, "分钟"
-        elif seconds < 86400:
-            return seconds // 3600, "小时"
-        else:
-            return seconds // 86400, "天"
+        return {
+            "en": self.format_time_duration(seconds, "en"),
+            "cn": self.format_time_duration(seconds, "cn")
+        }
+
+    def _format_reason(self, template: str, template_cn: str, **kwargs) -> Tuple[str, str]:
+        """格式化原因文案
+        
+        Args:
+            template: 英文模板
+            template_cn: 中文模板
+            **kwargs: 格式化参数
+            
+        Returns:
+            Tuple[str, str]: (英文原因, 中文原因)
+        """
+        if not kwargs:
+            return "", ""
+            
+        # 处理时间相关的参数
+        if "wait_time" in kwargs:
+            wait_times = self._get_time_descriptions(kwargs["wait_time"])
+            kwargs.update({
+                "wait_value_en": wait_times["en"][0],
+                "wait_unit_en": wait_times["en"][1],
+                "wait_value_cn": wait_times["cn"][0],
+                "wait_unit_cn": wait_times["cn"][1]
+            })
+            
+        if "window_size" in kwargs:
+            window_times = self._get_time_descriptions(kwargs["window_size"])
+            kwargs.update({
+                "time_value_en": window_times["en"][0],
+                "time_unit_en": window_times["en"][1],
+                "time_value_cn": window_times["cn"][0],
+                "time_unit_cn": window_times["cn"][1]
+            })
+            
+        return (
+            template.format(**kwargs) if kwargs else "",
+            template_cn.format(**kwargs) if kwargs else ""
+        )
+
+    def _build_response(self, allowed: bool, remaining: int, reset_time: int, 
+                       reason: str, reason_cn: str, reason_code: str) -> Dict[str, Any]:
+        """构建返回结果
+        
+        Args:
+            allowed: 是否允许请求
+            remaining: 剩余请求数
+            reset_time: 重置时间戳
+            reason: 英文原因
+            reason_cn: 中文原因
+            reason_code: 原因代码
+            
+        Returns:
+            Dict[str, Any]: 返回结果
+        """
+        return {
+            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
+            self.REMAINING_KEY: remaining,
+            self.RESET_TIME_KEY: reset_time,
+            self.REASON_KEY: reason,
+            self.REASON_CN_KEY: reason_cn,
+            self.REASON_CODE_KEY: reason_code
+        }
 
 class TokenBucketAlgorithm(RateLimiterAlgorithm):
     """令牌桶算法
@@ -181,15 +293,21 @@ class TokenBucketAlgorithm(RateLimiterAlgorithm):
         allowed = tokens >= 1
         wait_time = int((1 - tokens) / self.rate) if tokens < 1 else 0
         
-        reason = f"当前系统处理能力为每秒{self.rate}个请求，请{wait_time}秒后再试" if not allowed else ""
+        reason, reason_cn = self._format_reason(
+            self.TOKEN_BUCKET_REASON_TEMPLATE,
+            self.TOKEN_BUCKET_REASON_CN_TEMPLATE,
+            rate=self.rate,
+            wait_time=wait_time
+        ) if not allowed else ("", "")
         
-        return {
-            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
-            self.REMAINING_KEY: int(tokens),
-            self.RESET_TIME_KEY: int(time.time() + (1 / self.rate)),
-            self.REASON_KEY: reason,
-            self.REASON_CODE_KEY: self.RATE_LIMIT_NO_TOKENS if not allowed else self.RATE_LIMIT_OK
-        }
+        return self._build_response(
+            allowed=allowed,
+            remaining=int(tokens),
+            reset_time=int(time.time() + (1 / self.rate)),
+            reason=reason,
+            reason_cn=reason_cn,
+            reason_code=self.RATE_LIMIT_NO_TOKENS if not allowed else self.RATE_LIMIT_OK
+        )
 
 class FixedWindowAlgorithm(RateLimiterAlgorithm):
     """固定窗口算法
@@ -247,17 +365,23 @@ class FixedWindowAlgorithm(RateLimiterAlgorithm):
         allowed = count < self.max_requests
         wait_time = window_start + self.window_size - now
         
-        # 使用公共方法转换时间
-        time_value, time_unit = self.format_time_duration(self.window_size)
-        reason = f"当前{time_value}{time_unit}内最多允许{self.max_requests}次请求，已使用{count}次，请{wait_time}秒后再试" if not allowed else ""
+        reason, reason_cn = self._format_reason(
+            self.FIXED_WINDOW_REASON_TEMPLATE,
+            self.FIXED_WINDOW_REASON_CN_TEMPLATE,
+            max_requests=self.max_requests,
+            window_size=self.window_size,
+            count=count,
+            wait_time=wait_time
+        ) if not allowed else ("", "")
         
-        return {
-            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
-            self.REMAINING_KEY: max(0, self.max_requests - count),
-            self.RESET_TIME_KEY: window_start + self.window_size,
-            self.REASON_KEY: reason,
-            self.REASON_CODE_KEY: self.RATE_LIMIT_MAX_REQUESTS if not allowed else self.RATE_LIMIT_OK
-        }
+        return self._build_response(
+            allowed=allowed,
+            remaining=max(0, self.max_requests - count),
+            reset_time=window_start + self.window_size,
+            reason=reason,
+            reason_cn=reason_cn,
+            reason_code=self.RATE_LIMIT_MAX_REQUESTS if not allowed else self.RATE_LIMIT_OK
+        )
 
 class SlidingWindowAlgorithm(RateLimiterAlgorithm):
     """滑动窗口算法
@@ -302,17 +426,23 @@ class SlidingWindowAlgorithm(RateLimiterAlgorithm):
         allowed = len(requests) < self.max_requests
         wait_time = int(requests[0] + self.window_size - now) if requests else 0
         
-        # 使用公共方法转换时间
-        time_value, time_unit = self.format_time_duration(self.window_size)
-        reason = f"当前{time_value}{time_unit}内最多允许{self.max_requests}次请求，已使用{len(requests)}次，请{wait_time}秒后再试" if not allowed else ""
+        reason, reason_cn = self._format_reason(
+            self.SLIDING_WINDOW_REASON_TEMPLATE,
+            self.SLIDING_WINDOW_REASON_CN_TEMPLATE,
+            max_requests=self.max_requests,
+            window_size=self.window_size,
+            count=len(requests),
+            wait_time=wait_time
+        ) if not allowed else ("", "")
         
-        return {
-            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
-            self.REMAINING_KEY: max(0, self.max_requests - len(requests)),
-            self.RESET_TIME_KEY: int(requests[0] + self.window_size if requests else now + self.window_size),
-            self.REASON_KEY: reason,
-            self.REASON_CODE_KEY: self.RATE_LIMIT_WINDOW_LIMIT if not allowed else self.RATE_LIMIT_OK
-        }
+        return self._build_response(
+            allowed=allowed,
+            remaining=max(0, self.max_requests - len(requests)),
+            reset_time=int(requests[0] + self.window_size if requests else now + self.window_size),
+            reason=reason,
+            reason_cn=reason_cn,
+            reason_code=self.RATE_LIMIT_WINDOW_LIMIT if not allowed else self.RATE_LIMIT_OK
+        )
 
 class LeakyBucketAlgorithm(RateLimiterAlgorithm):
     """漏桶算法
@@ -373,15 +503,21 @@ class LeakyBucketAlgorithm(RateLimiterAlgorithm):
         allowed = water < self.capacity
         wait_time = int((water - self.capacity + 1) / self.rate) if water >= self.capacity else 0
         
-        reason = f"当前系统处理能力为每秒{self.rate}个请求，队列已满，请{wait_time}秒后再试" if not allowed else ""
+        reason, reason_cn = self._format_reason(
+            self.LEAKY_BUCKET_REASON_TEMPLATE,
+            self.LEAKY_BUCKET_REASON_CN_TEMPLATE,
+            rate=self.rate,
+            wait_time=wait_time
+        ) if not allowed else ("", "")
         
-        return {
-            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
-            self.REMAINING_KEY: int(self.capacity - water),
-            self.RESET_TIME_KEY: int(now + (1 / self.rate)),
-            self.REASON_KEY: reason,
-            self.REASON_CODE_KEY: self.RATE_LIMIT_QUEUE_FULL if not allowed else self.RATE_LIMIT_OK
-        }
+        return self._build_response(
+            allowed=allowed,
+            remaining=int(self.capacity - water),
+            reset_time=int(now + (1 / self.rate)),
+            reason=reason,
+            reason_cn=reason_cn,
+            reason_code=self.RATE_LIMIT_QUEUE_FULL if not allowed else self.RATE_LIMIT_OK
+        )
 
 class MultipleBucketsAlgorithm(RateLimiterAlgorithm):
     """多级混合限流算法
@@ -495,29 +631,49 @@ class MultipleBucketsAlgorithm(RateLimiterAlgorithm):
         # 判断是否允许请求
         allowed = tokens >= 1 and len(requests) < self.max_requests and water < self.capacity
         
-        # 使用公共方法转换时间
-        time_value, time_unit = self.format_time_duration(self.window_size)
-        
         # 确定限流原因
         reason = ""
+        reason_cn = ""
         if not allowed:
             if tokens < 1:
                 wait_time = int((1 - tokens) / self.rate)
-                reason = f"当前系统处理能力为每秒{self.rate}个请求，请{wait_time}秒后再试"
+                reason, reason_cn = self._format_reason(
+                    self.TOKEN_BUCKET_REASON_TEMPLATE,
+                    self.TOKEN_BUCKET_REASON_CN_TEMPLATE,
+                    rate=self.rate,
+                    wait_time=wait_time
+                )
             elif len(requests) >= self.max_requests:
                 wait_time = int(requests[0] + self.window_size - now)
-                reason = f"当前{time_value}{time_unit}内最多允许{self.max_requests}次请求，已使用{len(requests)}次，请{wait_time}秒后再试"
+                reason, reason_cn = self._format_reason(
+                    self.SLIDING_WINDOW_REASON_TEMPLATE,
+                    self.SLIDING_WINDOW_REASON_CN_TEMPLATE,
+                    max_requests=self.max_requests,
+                    window_size=self.window_size,
+                    count=len(requests),
+                    wait_time=wait_time
+                )
             elif water >= self.capacity:
                 wait_time = int((water - self.capacity + 1) / self.rate)
-                reason = f"当前系统处理能力为每秒{self.rate}个请求，队列已满，请{wait_time}秒后再试"
+                reason, reason_cn = self._format_reason(
+                    self.LEAKY_BUCKET_REASON_TEMPLATE,
+                    self.LEAKY_BUCKET_REASON_CN_TEMPLATE,
+                    rate=self.rate,
+                    wait_time=wait_time
+                )
             else:
                 wait_time = int(reset_time - now)
-                reason = f"系统繁忙，请{wait_time}秒后再试"
+                reason, reason_cn = self._format_reason(
+                    self.MULTIPLE_BUCKETS_REASON_TEMPLATE,
+                    self.MULTIPLE_BUCKETS_REASON_CN_TEMPLATE,
+                    wait_time=wait_time
+                )
         
-        return {
-            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
-            self.REMAINING_KEY: min(int(tokens), self.max_requests - len(requests), int(self.capacity - water)),
-            self.RESET_TIME_KEY: int(reset_time),
-            self.REASON_KEY: reason,
-            self.REASON_CODE_KEY: self.RATE_LIMIT_MULTIPLE if not allowed else self.RATE_LIMIT_OK
-        } 
+        return self._build_response(
+            allowed=allowed,
+            remaining=min(int(tokens), self.max_requests - len(requests), int(self.capacity - water)),
+            reset_time=int(reset_time),
+            reason=reason,
+            reason_cn=reason_cn,
+            reason_code=self.RATE_LIMIT_MULTIPLE if not allowed else self.RATE_LIMIT_OK
+        ) 
