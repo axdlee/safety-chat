@@ -2,4 +2,4 @@ path: "/safety-chat/rate-limit-status"
 method: "GET"
 extra:
   python:
-    source: "endpoints/rate_limit_status.py"
+    source: "endpoints/rate_limit_status_endpoint.py"
