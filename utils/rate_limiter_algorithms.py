@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from storage.storage import Storage
 
 class RateLimiterAlgorithm(ABC):
@@ -29,6 +29,16 @@ class RateLimiterAlgorithm(ABC):
     ALLOWED_KEY = "allowed"
     REMAINING_KEY = "remaining"
     RESET_TIME_KEY = "reset_time"
+    REASON_KEY = "reason"
+    REASON_CODE_KEY = "reason_code"
+
+    # 限流错误码
+    RATE_LIMIT_OK = "rate_ok"  # 可以请求
+    RATE_LIMIT_NO_TOKENS = "rate_no_tokens"  # 令牌不足
+    RATE_LIMIT_MAX_REQUESTS = "rate_max_req"  # 请求数超限
+    RATE_LIMIT_QUEUE_FULL = "rate_queue_full"  # 队列已满
+    RATE_LIMIT_WINDOW_LIMIT = "rate_window"  # 时间窗口限制
+    RATE_LIMIT_MULTIPLE = "rate_multi"  # 混合限制
 
     # 算法填充参数
     # 令牌桶算法
@@ -70,7 +80,9 @@ class RateLimiterAlgorithm(ABC):
             Dict[str, Any]: {
                 "allowed": str,  # 是否允许请求("true"/"false")
                 "remaining": int,  # 剩余请求数
-                "reset_time": int  # 重置时间戳
+                "reset_time": int,  # 重置时间戳
+                "reason": str,  # 不允许的原因(如果允许则为空)
+                "reason_code": str  # 不允许的原因代码(如果允许则为RATE_LIMIT_OK)
             }
         """
         pass
@@ -86,10 +98,31 @@ class RateLimiterAlgorithm(ABC):
             Dict[str, Any]: {
                 "allowed": str,  # 是否允许请求("true"/"false")
                 "remaining": int,  # 剩余请求数
-                "reset_time": int  # 重置时间戳
+                "reset_time": int,  # 重置时间戳
+                "reason": str,  # 不允许的原因(如果允许则为空)
+                "reason_code": str  # 不允许的原因代码(如果允许则为RATE_LIMIT_OK)
             }
         """
         pass
+
+    @staticmethod
+    def format_time_duration(seconds: int) -> Tuple[int, str]:
+        """将秒数转换为更友好的时间描述
+        
+        Args:
+            seconds: 秒数
+            
+        Returns:
+            Tuple[int, str]: (时间值, 时间单位)
+        """
+        if seconds < 60:
+            return seconds, "秒"
+        elif seconds < 3600:
+            return seconds // 60, "分钟"
+        elif seconds < 86400:
+            return seconds // 3600, "小时"
+        else:
+            return seconds // 86400, "天"
 
 class TokenBucketAlgorithm(RateLimiterAlgorithm):
     """令牌桶算法
@@ -145,10 +178,17 @@ class TokenBucketAlgorithm(RateLimiterAlgorithm):
         time_passed = time.time() - data[self.LAST_REFILL_KEY]
         tokens = min(self.capacity, data[self.TOKENS_KEY] + time_passed * self.rate)
         
+        allowed = tokens >= 1
+        wait_time = int((1 - tokens) / self.rate) if tokens < 1 else 0
+        
+        reason = f"当前系统处理能力为每秒{self.rate}个请求，请{wait_time}秒后再试" if not allowed else ""
+        
         return {
-            self.ALLOWED_KEY: self.TRUE_STRING if tokens >= 1 else self.FALSE_STRING,
+            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
             self.REMAINING_KEY: int(tokens),
-            self.RESET_TIME_KEY: int(time.time() + (1 / self.rate))
+            self.RESET_TIME_KEY: int(time.time() + (1 / self.rate)),
+            self.REASON_KEY: reason,
+            self.REASON_CODE_KEY: self.RATE_LIMIT_NO_TOKENS if not allowed else self.RATE_LIMIT_OK
         }
 
 class FixedWindowAlgorithm(RateLimiterAlgorithm):
@@ -204,10 +244,19 @@ class FixedWindowAlgorithm(RateLimiterAlgorithm):
         else:
             count = data[self.COUNT_KEY]
             
+        allowed = count < self.max_requests
+        wait_time = window_start + self.window_size - now
+        
+        # 使用公共方法转换时间
+        time_value, time_unit = self.format_time_duration(self.window_size)
+        reason = f"当前{time_value}{time_unit}内最多允许{self.max_requests}次请求，已使用{count}次，请{wait_time}秒后再试" if not allowed else ""
+        
         return {
-            self.ALLOWED_KEY: self.TRUE_STRING if count < self.max_requests else self.FALSE_STRING,
+            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
             self.REMAINING_KEY: max(0, self.max_requests - count),
-            self.RESET_TIME_KEY: window_start + self.window_size
+            self.RESET_TIME_KEY: window_start + self.window_size,
+            self.REASON_KEY: reason,
+            self.REASON_CODE_KEY: self.RATE_LIMIT_MAX_REQUESTS if not allowed else self.RATE_LIMIT_OK
         }
 
 class SlidingWindowAlgorithm(RateLimiterAlgorithm):
@@ -250,10 +299,19 @@ class SlidingWindowAlgorithm(RateLimiterAlgorithm):
         window_start = now - self.window_size
         requests = [t for t in data[self.REQUESTS_KEY] if t > window_start]
         
+        allowed = len(requests) < self.max_requests
+        wait_time = int(requests[0] + self.window_size - now) if requests else 0
+        
+        # 使用公共方法转换时间
+        time_value, time_unit = self.format_time_duration(self.window_size)
+        reason = f"当前{time_value}{time_unit}内最多允许{self.max_requests}次请求，已使用{len(requests)}次，请{wait_time}秒后再试" if not allowed else ""
+        
         return {
-            self.ALLOWED_KEY: self.TRUE_STRING if len(requests) < self.max_requests else self.FALSE_STRING,
+            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
             self.REMAINING_KEY: max(0, self.max_requests - len(requests)),
-            self.RESET_TIME_KEY: int(requests[0] + self.window_size if requests else now + self.window_size)
+            self.RESET_TIME_KEY: int(requests[0] + self.window_size if requests else now + self.window_size),
+            self.REASON_KEY: reason,
+            self.REASON_CODE_KEY: self.RATE_LIMIT_WINDOW_LIMIT if not allowed else self.RATE_LIMIT_OK
         }
 
 class LeakyBucketAlgorithm(RateLimiterAlgorithm):
@@ -312,10 +370,17 @@ class LeakyBucketAlgorithm(RateLimiterAlgorithm):
         time_passed = now - data[self.LAST_LEAK_KEY]
         water = max(0, data[self.WATER_KEY] - time_passed * self.rate)
         
+        allowed = water < self.capacity
+        wait_time = int((water - self.capacity + 1) / self.rate) if water >= self.capacity else 0
+        
+        reason = f"当前系统处理能力为每秒{self.rate}个请求，队列已满，请{wait_time}秒后再试" if not allowed else ""
+        
         return {
-            self.ALLOWED_KEY: self.TRUE_STRING if water < self.capacity else self.FALSE_STRING,
+            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
             self.REMAINING_KEY: int(self.capacity - water),
-            self.RESET_TIME_KEY: int(now + (1 / self.rate))
+            self.RESET_TIME_KEY: int(now + (1 / self.rate)),
+            self.REASON_KEY: reason,
+            self.REASON_CODE_KEY: self.RATE_LIMIT_QUEUE_FULL if not allowed else self.RATE_LIMIT_OK
         }
 
 class MultipleBucketsAlgorithm(RateLimiterAlgorithm):
@@ -427,8 +492,32 @@ class MultipleBucketsAlgorithm(RateLimiterAlgorithm):
             
         reset_time = min(reset_times) if reset_times else now + self.window_size
         
+        # 判断是否允许请求
+        allowed = tokens >= 1 and len(requests) < self.max_requests and water < self.capacity
+        
+        # 使用公共方法转换时间
+        time_value, time_unit = self.format_time_duration(self.window_size)
+        
+        # 确定限流原因
+        reason = ""
+        if not allowed:
+            if tokens < 1:
+                wait_time = int((1 - tokens) / self.rate)
+                reason = f"当前系统处理能力为每秒{self.rate}个请求，请{wait_time}秒后再试"
+            elif len(requests) >= self.max_requests:
+                wait_time = int(requests[0] + self.window_size - now)
+                reason = f"当前{time_value}{time_unit}内最多允许{self.max_requests}次请求，已使用{len(requests)}次，请{wait_time}秒后再试"
+            elif water >= self.capacity:
+                wait_time = int((water - self.capacity + 1) / self.rate)
+                reason = f"当前系统处理能力为每秒{self.rate}个请求，队列已满，请{wait_time}秒后再试"
+            else:
+                wait_time = int(reset_time - now)
+                reason = f"系统繁忙，请{wait_time}秒后再试"
+        
         return {
-            self.ALLOWED_KEY: self.TRUE_STRING if tokens >= 1 and len(requests) < self.max_requests and water < self.capacity else self.FALSE_STRING,
+            self.ALLOWED_KEY: self.TRUE_STRING if allowed else self.FALSE_STRING,
             self.REMAINING_KEY: min(int(tokens), self.max_requests - len(requests), int(self.capacity - water)),
-            self.RESET_TIME_KEY: int(reset_time)
+            self.RESET_TIME_KEY: int(reset_time),
+            self.REASON_KEY: reason,
+            self.REASON_CODE_KEY: self.RATE_LIMIT_MULTIPLE if not allowed else self.RATE_LIMIT_OK
         } 
