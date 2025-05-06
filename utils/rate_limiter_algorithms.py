@@ -43,24 +43,24 @@ class RateLimiterAlgorithm(ABC):
 
     # 文案模板
     # 令牌桶算法
-    TOKEN_BUCKET_REASON_TEMPLATE = "System processing capacity is {rate} requests per second, please try again in {wait_time} seconds"
-    TOKEN_BUCKET_REASON_CN_TEMPLATE = "当前系统处理能力为每秒{rate}个请求，请{wait_time}秒后再试"
+    TOKEN_BUCKET_REASON_TEMPLATE = "System processing capacity is {rate} requests per second, please try again in {wait_value_en} {wait_unit_en}"
+    TOKEN_BUCKET_REASON_CN_TEMPLATE = "当前系统处理能力为每秒{rate}个请求，请{wait_value_cn}{wait_unit_cn}后再试"
 
     # 固定窗口算法
-    FIXED_WINDOW_REASON_TEMPLATE = "Maximum {max_requests} requests allowed in {time_value} {time_unit}, {count} used, please try again in {wait_time} seconds"
-    FIXED_WINDOW_REASON_CN_TEMPLATE = "当前{time_value}{time_unit}内最多允许{max_requests}次请求，已使用{count}次，请{wait_time}秒后再试"
+    FIXED_WINDOW_REASON_TEMPLATE = "Maximum {max_requests} requests allowed in {time_value_en} {time_unit_en}, {count} used, please try again in {wait_value_en} {wait_unit_en}"
+    FIXED_WINDOW_REASON_CN_TEMPLATE = "当前{time_value_cn}{time_unit_cn}内最多允许{max_requests}次请求，已使用{count}次，请{wait_value_cn}{wait_unit_cn}后再试"
 
     # 滑动窗口算法
-    SLIDING_WINDOW_REASON_TEMPLATE = "Maximum {max_requests} requests allowed in {time_value} {time_unit}, {count} used, please try again in {wait_time} seconds"
-    SLIDING_WINDOW_REASON_CN_TEMPLATE = "当前{time_value}{time_unit}内最多允许{max_requests}次请求，已使用{count}次，请{wait_time}秒后再试"
+    SLIDING_WINDOW_REASON_TEMPLATE = "Maximum {max_requests} requests allowed in {time_value_en} {time_unit_en}, {count} used, please try again in {wait_value_en} {wait_unit_en}"
+    SLIDING_WINDOW_REASON_CN_TEMPLATE = "当前{time_value_cn}{time_unit_cn}内最多允许{max_requests}次请求，已使用{count}次，请{wait_value_cn}{wait_unit_cn}后再试"
 
     # 漏桶算法
-    LEAKY_BUCKET_REASON_TEMPLATE = "System processing capacity is {rate} requests per second, queue is full, please try again in {wait_time} seconds"
-    LEAKY_BUCKET_REASON_CN_TEMPLATE = "当前系统处理能力为每秒{rate}个请求，队列已满，请{wait_time}秒后再试"
+    LEAKY_BUCKET_REASON_TEMPLATE = "System processing capacity is {rate} requests per second, queue is full, please try again in {wait_value_en} {wait_unit_en}"
+    LEAKY_BUCKET_REASON_CN_TEMPLATE = "当前系统处理能力为每秒{rate}个请求，队列已满，请{wait_value_cn}{wait_unit_cn}后再试"
 
     # 多级混合限流
-    MULTIPLE_BUCKETS_REASON_TEMPLATE = "System is busy, please try again in {wait_time} seconds"
-    MULTIPLE_BUCKETS_REASON_CN_TEMPLATE = "系统繁忙，请{wait_time}秒后再试"
+    MULTIPLE_BUCKETS_REASON_TEMPLATE = "System is busy, please try again in {wait_value_en} {wait_unit_en}"
+    MULTIPLE_BUCKETS_REASON_CN_TEMPLATE = "系统繁忙，请{wait_value_cn}{wait_unit_cn}后再试"
 
     # 算法填充参数
     # 令牌桶算法
