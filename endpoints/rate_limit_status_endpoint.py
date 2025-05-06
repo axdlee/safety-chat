@@ -1,3 +1,4 @@
+import json
 from typing import Mapping
 from werkzeug import Request, Response
 from dify_plugin import Endpoint
@@ -12,25 +13,26 @@ class RateLimitStatusEndpoint(Endpoint):
         print(f"user_id: {user_id}, unique_id: {unique_id}")
         if not unique_id:
             return Response(
-                response=f'Missing required parameters: {RateLimiterAlgorithm.UNIQUE_ID_KEY}',
+                response=json.dumps({"error": f'Missing required parameters: {RateLimiterAlgorithm.UNIQUE_ID_KEY}'}),
                 status=400,
                 content_type="application/json"
             )
         if not user_id:
             return Response(
-                response=f'Missing required parameters: {RateLimiterAlgorithm.USER_ID_KEY}',
+                response=json.dumps({"error": f'Missing required parameters: {RateLimiterAlgorithm.USER_ID_KEY}'}),
                 status=400,
                 content_type="application/json"
             )
         
         try:
-            rate_limiter_status = self.session.tool.invoke_api_tool("axdlee/safety_chat", "rate_limiter_status", parameters={
+            rate_limiter_status = self.session.tool.invoke_builtin_tool("axdlee/safety_chat/safety_chat", "rate_limiter_status", parameters={
                 RateLimiterAlgorithm.UNIQUE_ID_KEY: unique_id,
                 RateLimiterAlgorithm.USER_ID_KEY: user_id
             })
 
             def generator():
-                yield from rate_limiter_status
+                for chunk in rate_limiter_status:
+                    yield json.dumps(chunk) + "\n\n"
             return Response(
                 response=generator(),
                 status=200,
@@ -39,7 +41,7 @@ class RateLimitStatusEndpoint(Endpoint):
             
         except Exception as e:
             return Response(
-                response=f'Failed to get rate limit status: {str(e)}',
+                response=json.dumps({"error": f'Failed to get rate limit status: {str(e)}'}),
                 status=500,
                 content_type="application/json"
             ) 
