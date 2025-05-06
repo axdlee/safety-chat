@@ -73,7 +73,7 @@ class RateLimiterStatusTool(Tool, RateLimiterMixin):
             )
             
             # 执行状态查询
-            key = f"{parameters[RateLimiterAlgorithm.USER_ID_KEY]}:{config[RateLimiterAlgorithm.ACTION_TYPE_KEY]}"
+            key = f"{parameters[RateLimiterAlgorithm.USER_ID_KEY]}:{config[RateLimiterAlgorithm.ACTION_TYPE_KEY]}:{config_unique_id}"
             result = self.algorithm.get_status(key)
             
             # 返回结果

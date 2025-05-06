@@ -73,7 +73,7 @@ class RateLimiterCheckTool(Tool, RateLimiterMixin):
             )
             
             # 执行限流检查
-            key = f"{parameters[RateLimiterAlgorithm.USER_ID_KEY]}:{parameters[RateLimiterAlgorithm.ACTION_TYPE_KEY]}"
+            key = f"{parameters[RateLimiterAlgorithm.USER_ID_KEY]}:{parameters[RateLimiterAlgorithm.ACTION_TYPE_KEY]}:{config_unique_id}"
             result = self.algorithm.check(key)
             
             # 返回结果
