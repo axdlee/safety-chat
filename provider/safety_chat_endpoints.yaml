@@ -11,17 +11,5 @@ settings:
     placeholder:
       en_US: Please provide the unique identifier for rate limit configuration
       zh_Hans: 请提供需要进行频率限制配置的唯一标识
-  - name: user_id
-    type: text-input
-    required: true
-    label:
-      en_US: User ID
-      zh_Hans: 用户ID
-    help:
-      en_US: The ID of the user making the request
-      zh_Hans: 发起请求的用户ID
-    placeholder:
-      en_US: Please provide the user ID for rate limit checking
-      zh_Hans: 请提供需要进行频率限制检查的用户ID
 endpoints:
   - endpoints/rate_limit_status_endpoint.yaml
