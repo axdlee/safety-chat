@@ -164,22 +164,27 @@ class RateLimiterMixin:
             self.storage = self._get_storage(storage_type, **storage_config)
         
     def init_config(self, unique_id: str, parameters: Dict[str, Any]) -> None:
-        """初始化配置
+        """初始化或更新配置
         
         Args:
             unique_id: 配置唯一标识
             parameters: 配置参数
         """
-        if not self.storage.get(self.CONFIG_KEY_PREFIX + ":" + unique_id):
-            config = {
-                RateLimiterAlgorithm.ACTION_TYPE_KEY: parameters.get(RateLimiterAlgorithm.ACTION_TYPE_KEY),
-                RateLimiterAlgorithm.ALGORITHM_TYPE_KEY: parameters.get(RateLimiterAlgorithm.ALGORITHM_TYPE_KEY),
-                RateLimiterAlgorithm.RATE_KEY: parameters.get(RateLimiterAlgorithm.RATE_KEY),
-                RateLimiterAlgorithm.CAPACITY_KEY: parameters.get(RateLimiterAlgorithm.CAPACITY_KEY),
-                RateLimiterAlgorithm.MAX_REQUESTS_KEY: parameters.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY),
-                RateLimiterAlgorithm.WINDOW_SIZE_KEY: parameters.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY)
-            }
-            self.storage.set(self.CONFIG_KEY_PREFIX + ":" + unique_id, config)
+        config_key = self.CONFIG_KEY_PREFIX + ":" + unique_id
+        existing_config = self.storage.get(config_key)
+        
+        new_config = {
+            RateLimiterAlgorithm.ACTION_TYPE_KEY: parameters.get(RateLimiterAlgorithm.ACTION_TYPE_KEY),
+            RateLimiterAlgorithm.ALGORITHM_TYPE_KEY: parameters.get(RateLimiterAlgorithm.ALGORITHM_TYPE_KEY),
+            RateLimiterAlgorithm.RATE_KEY: parameters.get(RateLimiterAlgorithm.RATE_KEY),
+            RateLimiterAlgorithm.CAPACITY_KEY: parameters.get(RateLimiterAlgorithm.CAPACITY_KEY),
+            RateLimiterAlgorithm.MAX_REQUESTS_KEY: parameters.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY),
+            RateLimiterAlgorithm.WINDOW_SIZE_KEY: parameters.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY)
+        }
+        
+        # 如果配置不存在或有变化，则更新
+        if not existing_config or existing_config != new_config:
+            self.storage.set(config_key, new_config)
             
     def get_config(self, unique_id: str) -> Dict[str, Any]:
         """获取配置
