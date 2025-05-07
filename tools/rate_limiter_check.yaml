@@ -25,6 +25,7 @@ parameters:
   - name: unique_id
     type: string
     required: true
+    default: "default"
     label:
       en_US: Unique ID
       zh_Hans: 唯一标识
