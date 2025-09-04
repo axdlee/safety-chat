@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 from abc import ABC, abstractmethod
 from utils.rate_limiter_algorithms import (
     TokenBucketAlgorithm,
@@ -67,7 +67,7 @@ class RateLimiterMixin:
         self.storage = PluginPersistentStorage(self.session.storage)
         
     @abstractmethod
-    def validate_parameters(self, parameters: Dict[str, Any], required_fields: list) -> None:
+    def validate_parameters(self, parameters: Dict[str, Any], required_fields: Optional[List[str]] = None) -> None:
         """验证参数
         
         Args:
@@ -99,7 +99,7 @@ class RateLimiterMixin:
             
         return storages[storage_type](**kwargs)
         
-    def get_algorithm(self, algorithm_type: str = None, **kwargs) -> Any:
+    def get_algorithm(self, algorithm_type: Optional[str] = None, **kwargs) -> Any:
         """获取限流算法实例
         
         Args:
@@ -120,28 +120,25 @@ class RateLimiterMixin:
         if algorithm_type not in self.ALGORITHM_MAP:
             raise ValueError(f"Unsupported algorithm type: {algorithm_type}")
             
-        # 根据算法类型构建参数
+        # 根据算法类型构建参数，使用默认值而不是过滤掉 None 值
         algorithm_params = {}
         if algorithm_type in [RateLimiterAlgorithm.TOKEN_BUCKET_ALGORITHM, RateLimiterAlgorithm.LEAKY_BUCKET_ALGORITHM]:
             algorithm_params = {
-                RateLimiterAlgorithm.RATE_KEY: kwargs.get(RateLimiterAlgorithm.RATE_KEY),
-                RateLimiterAlgorithm.CAPACITY_KEY: kwargs.get(RateLimiterAlgorithm.CAPACITY_KEY)
+                RateLimiterAlgorithm.RATE_KEY: kwargs.get(RateLimiterAlgorithm.RATE_KEY) or 10,
+                RateLimiterAlgorithm.CAPACITY_KEY: kwargs.get(RateLimiterAlgorithm.CAPACITY_KEY) or 100
             }
         elif algorithm_type in [RateLimiterAlgorithm.FIXED_WINDOW_ALGORITHM, RateLimiterAlgorithm.SLIDING_WINDOW_ALGORITHM]:
             algorithm_params = {
-                RateLimiterAlgorithm.MAX_REQUESTS_KEY: kwargs.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY),
-                RateLimiterAlgorithm.WINDOW_SIZE_KEY: kwargs.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY)
+                RateLimiterAlgorithm.MAX_REQUESTS_KEY: kwargs.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY) or 100,
+                RateLimiterAlgorithm.WINDOW_SIZE_KEY: kwargs.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY) or 60
             }
         elif algorithm_type == RateLimiterAlgorithm.MULTIPLE_BUCKETS_ALGORITHM:
             algorithm_params = {
-                RateLimiterAlgorithm.RATE_KEY: kwargs.get(RateLimiterAlgorithm.RATE_KEY),
-                RateLimiterAlgorithm.CAPACITY_KEY: kwargs.get(RateLimiterAlgorithm.CAPACITY_KEY),
-                RateLimiterAlgorithm.MAX_REQUESTS_KEY: kwargs.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY),
-                RateLimiterAlgorithm.WINDOW_SIZE_KEY: kwargs.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY)
+                RateLimiterAlgorithm.RATE_KEY: kwargs.get(RateLimiterAlgorithm.RATE_KEY) or 10,
+                RateLimiterAlgorithm.CAPACITY_KEY: kwargs.get(RateLimiterAlgorithm.CAPACITY_KEY) or 100,
+                RateLimiterAlgorithm.MAX_REQUESTS_KEY: kwargs.get(RateLimiterAlgorithm.MAX_REQUESTS_KEY) or 1000,
+                RateLimiterAlgorithm.WINDOW_SIZE_KEY: kwargs.get(RateLimiterAlgorithm.WINDOW_SIZE_KEY) or 3600
             }
-            
-        # 过滤掉 None 值
-        algorithm_params = {k: v for k, v in algorithm_params.items() if v is not None}
         # 创建算法实例
         return self.ALGORITHM_MAP[algorithm_type](storage=self.storage, **algorithm_params)
         
@@ -186,7 +183,7 @@ class RateLimiterMixin:
         if not existing_config or existing_config != new_config:
             self.storage.set(config_key, new_config)
             
-    def get_config(self, unique_id: str) -> Dict[str, Any]:
+    def get_config(self, unique_id: str) -> Optional[Dict[str, Any]]:
         """获取配置
         
         Args:

@@ -1,4 +1,4 @@
-version: 0.0.3
+version: 0.0.4
 type: plugin
 author: axdlee
 name: safety_chat
@@ -18,7 +18,7 @@ meta:
     entrypoint: main
     language: python
     version: "3.12"
-  version: 0.0.1
+  version: 0.0.4
 plugins:
   tools:
     - provider/safety_chat.yaml

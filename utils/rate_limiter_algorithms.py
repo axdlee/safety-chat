@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import time
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 from storage.storage import Storage
 
 class RateLimiterAlgorithm(ABC):
@@ -243,10 +243,10 @@ class TokenBucketAlgorithm(RateLimiterAlgorithm):
     请求消耗令牌，若令牌不足则拒绝请求。支持突发流量，并保证长期平均速率。
     """
     
-    def __init__(self, storage: Storage, rate: float = 10, capacity: int = 100):
+    def __init__(self, storage: Storage, rate: Optional[float] = 10, capacity: Optional[int] = 100):
         super().__init__(storage)
-        self.rate = rate  # 令牌产生速率(每秒)
-        self.capacity = capacity  # 桶容量
+        self.rate = rate or 10  # 令牌产生速率(每秒)
+        self.capacity = capacity or 100  # 桶容量
         
     def check(self, key: str, **kwargs) -> Dict[str, Any]:
         # 获取当前状态
@@ -316,10 +316,10 @@ class FixedWindowAlgorithm(RateLimiterAlgorithm):
     若超过阈值则拒绝后续请求。实现简单但存在时间边界突发问题。
     """
     
-    def __init__(self, storage: Storage, max_requests: int = 100, window_size: int = 60):
+    def __init__(self, storage: Storage, max_requests: Optional[int] = 100, window_size: Optional[int] = 60):
         super().__init__(storage)
-        self.max_requests = max_requests  # 窗口内最大请求数
-        self.window_size = window_size  # 窗口大小(秒)
+        self.max_requests = max_requests or 100  # 窗口内最大请求数
+        self.window_size = window_size or 60  # 窗口大小(秒)
         
     def check(self, key: str, **kwargs) -> Dict[str, Any]:
         # 获取当前状态
@@ -390,10 +390,10 @@ class SlidingWindowAlgorithm(RateLimiterAlgorithm):
     相比固定窗口更精确，但需存储更多数据。
     """
     
-    def __init__(self, storage: Storage, max_requests: int = 100, window_size: int = 60):
+    def __init__(self, storage: Storage, max_requests: Optional[int] = 100, window_size: Optional[int] = 60):
         super().__init__(storage)
-        self.max_requests = max_requests  # 窗口内最大请求数
-        self.window_size = window_size  # 窗口大小(秒)
+        self.max_requests = max_requests or 100  # 窗口内最大请求数
+        self.window_size = window_size or 60  # 窗口大小(秒)
         
     def check(self, key: str, **kwargs) -> Dict[str, Any]:
         # 获取当前状态
@@ -451,10 +451,10 @@ class LeakyBucketAlgorithm(RateLimiterAlgorithm):
     适用于平滑流量，但灵活性较低。
     """
     
-    def __init__(self, storage: Storage, rate: float = 10, capacity: int = 100):
+    def __init__(self, storage: Storage, rate: Optional[float] = 10, capacity: Optional[int] = 100):
         super().__init__(storage)
-        self.rate = rate  # 漏出速率(每秒)
-        self.capacity = capacity  # 桶容量
+        self.rate = rate or 10  # 漏出速率(每秒)
+        self.capacity = capacity or 100  # 桶容量
         
     def check(self, key: str, **kwargs) -> Dict[str, Any]:
         # 获取当前状态
@@ -529,8 +529,8 @@ class MultipleBucketsAlgorithm(RateLimiterAlgorithm):
     4. 漏桶: 通过固定速率处理请求，保证稳定的处理能力
     """
     
-    def __init__(self, storage: Storage, rate: float = 10, capacity: int = 100,
-                 max_requests: int = 1000, window_size: int = 3600):
+    def __init__(self, storage: Storage, rate: Optional[float] = 10, capacity: Optional[int] = 100,
+                 max_requests: Optional[int] = 1000, window_size: Optional[int] = 3600):
         """初始化混合限流算法
         
         Args:
@@ -541,10 +541,10 @@ class MultipleBucketsAlgorithm(RateLimiterAlgorithm):
             window_size: 时间窗口大小(秒)
         """
         super().__init__(storage)
-        self.rate = rate
-        self.capacity = capacity
-        self.max_requests = max_requests
-        self.window_size = window_size
+        self.rate = rate or 10
+        self.capacity = capacity or 100
+        self.max_requests = max_requests or 1000
+        self.window_size = window_size or 3600
         
     def check(self, key: str, **kwargs) -> Dict[str, Any]:
         # 获取当前状态
